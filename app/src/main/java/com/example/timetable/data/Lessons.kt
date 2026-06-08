@@ -1,27 +1,32 @@
 package com.example.timetable.data
 
-
-class Lessons (
-    courseTitle: String,
-    lessonRef: String,
-    lessonBlock: String,
-    courseRef: String,
-    dates: String,
-    startTime: String,
-    endTime: String,
-    subjectCode: String,
-    classCodes: String,
-    roomCodes: String?,
-    buildingCodes: String?,
-    changes: Changes?
+data class TimetableData(
+    val lessons: List<Lesson>,
+    val holidayEvents: List<HolidayEvent>
 )
 
-class Changes (
-    caption: String,
-    changeType: Int,
-    absentTeacherCodes: String?,
-    reasonType: String?,
-    lessonTitle: String,
-    cancelled: String,
-    modified: String
+data class Lesson(
+    val serverId: String?,
+    val title: String,
+    val date: String,
+    val startTime: String,
+    val endTime: String,
+    val room: String?,
+    val building: String?,
+    val className: String?,
+    val changes: Change?
+) {
+    data class Change(
+        val caption: String?,
+        val reasonType: String?,
+        val modified: String?
+    )
+}
+
+data class HolidayEvent(
+    val serverId: String?,
+    val title: String,
+    val startDate: String,
+    val endDate: String,
+    val wholeDay: Boolean
 )

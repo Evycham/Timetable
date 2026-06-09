@@ -1,7 +1,6 @@
 package com.example.timetable.data
 
 import org.json.JSONObject
-import java.net.HttpURLConnection
 import java.net.URL
 
 class DaVinciApi {
@@ -12,9 +11,11 @@ class DaVinciApi {
         val jsonString = URL(url).readText()
 
         val root = JSONObject(jsonString)
+        val result = root.getJSONObject("result")
+        val displaySchedule = result.getJSONObject("displaySchedule")
 
-        val lessonTimes = root.getJSONArray("lessonTimes")
-        val eventTimes = root.getJSONArray("eventTimes")
+        val lessonTimes = displaySchedule.getJSONArray("lessonTimes")
+        val eventTimes = displaySchedule.getJSONArray("eventTimes")
 
         return DaVinciResponse(
             lessonTimes = lessonTimes,

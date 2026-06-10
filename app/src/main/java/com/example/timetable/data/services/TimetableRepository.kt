@@ -93,6 +93,18 @@ class TimetableRepository(
         lessons.filter { groupsCode in it.groupsCode }
 
     /**
+     * Filtert Lessons nach Titel und Studiengangs- oder Gruppencode.
+     *
+     * @param title Der gesuchte Lesson-Titel.
+     * @param groupsCode Der gesuchte Studiengangs- oder Gruppencode.
+     * @return Alle passenden Lessons.
+     */
+    fun getLessonsByTitleAndGroupsCode(title: String, groupsCode: String): List<Lesson> =
+        lessons.filter { lesson ->
+            lesson.title == title && groupsCode in lesson.groupsCode
+        }
+
+    /**
      * Gibt alle Lessons für ein bestimmtes Datum zurück.
      *
      * @param date Datum im Format `YYYY-MM-DD`.

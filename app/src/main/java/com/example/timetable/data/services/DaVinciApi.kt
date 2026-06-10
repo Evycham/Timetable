@@ -40,6 +40,19 @@ class DaVinciApi(
     }
 
     /**
+     * Laedt die lokal gespeicherte Raw-JSON-Datei und parsed sie.
+     *
+     * @param storageDir Verzeichnis der lokalen Cache-Datei.
+     * @return Die geparste API-Antwort oder `null`, wenn noch keine Datei existiert.
+     */
+    fun loadFromCache(storageDir: File): DaVinciResponse? {
+        val cacheFile = storageDir.resolve(RAW_CACHE_FILE_NAME)
+        if (!cacheFile.exists()) return null
+
+        return parseResponse(cacheFile.readText())
+    }
+
+    /**
      * Prüft, ob sich die DaVinci-Daten geändert haben, und ersetzt bei Bedarf die alte Cache-Datei.
      *
      * @param storageDir Verzeichnis für die lokale Cache-Datei.

@@ -1,6 +1,6 @@
 package com.example.timetable
 
-import com.example.timetable.data.CalenderDayMapper
+import com.example.timetable.data.services.CalenderDayMapper
 import com.example.timetable.data.datenmodell.Event
 import com.example.timetable.data.datenmodell.Lesson
 import org.junit.Assert.assertEquals

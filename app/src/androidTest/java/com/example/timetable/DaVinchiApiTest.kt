@@ -1,6 +1,6 @@
 package com.example.timetable
 
-import com.example.timetable.data.DaVinciApi
+import com.example.timetable.data.services.DaVinciApi
 import org.junit.Assert.assertTrue
 import org.junit.Test
 

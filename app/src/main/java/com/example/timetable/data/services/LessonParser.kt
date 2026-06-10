@@ -1,4 +1,4 @@
-package com.example.timetable.data
+package com.example.timetable.data.services
 
 import com.example.timetable.data.datenmodell.Event
 import com.example.timetable.data.datenmodell.Lesson

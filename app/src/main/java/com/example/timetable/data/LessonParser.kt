@@ -1,5 +1,7 @@
 package com.example.timetable.data
 
+import com.example.timetable.data.datenmodell.Event
+import com.example.timetable.data.datenmodell.Lesson
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -66,12 +68,12 @@ class LessonParser {
      * Parsed ein komplettes Event-Array aus der API in eine Liste von Holiday-Events.
      *
      * @param array JSON-Array aus `eventTimes`.
-     * @return Liste aller gültigen Holiday-Events, bei `null` eine leere Liste.
+     * @return Liste aller gueltigen Events, bei `null` eine leere Liste.
      */
-    fun parseEvents(array: JSONArray?): List<HolidayEvent> {
+    fun parseEvents(array: JSONArray?): List<Event> {
         if (array == null) return emptyList()
 
-        val events = mutableListOf<HolidayEvent>()
+        val events = mutableListOf<Event>()
         for (i in 0 until array.length()) {
             val eventObject = array.optJSONObject(i) ?: continue
             val event = parseEvent(eventObject) ?: continue
@@ -84,15 +86,15 @@ class LessonParser {
      * Parsed ein einzelnes Event-Objekt aus der API.
      *
      * @param obj Ein JSON-Objekt aus `eventTimes`.
-     * @return Ein HolidayEvent oder `null`, falls Pflichtfelder fehlen.
+     * @return Ein Event oder `null`, falls Pflichtfelder fehlen.
      */
-    fun parseEvent(obj: JSONObject): HolidayEvent? {
+    fun parseEvent(obj: JSONObject): Event? {
         val title = obj.optString("title").takeIf { it.isNotBlank() } ?: return null
         val startDate = formatDate(obj.optString("startDate")).ifBlank { return null }
         val endDate = formatDate(obj.optString("endDate")).ifBlank { startDate }
         val category = obj.optString("category").takeIf { it.isNotBlank() }
 
-        return HolidayEvent(
+        return Event(
             id = obj.optString("id").takeIf { it.isNotBlank() },
             title = title,
             startDate = startDate,

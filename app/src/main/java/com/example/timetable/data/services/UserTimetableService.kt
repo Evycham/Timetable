@@ -1,10 +1,12 @@
 package com.example.timetable.data.services
 
+import com.example.timetable.data.TimetableRepository
 import com.example.timetable.data.datenmodell.CalenderDay
 import com.example.timetable.data.datenmodell.HiddenLessonRule
 import com.example.timetable.data.datenmodell.Lesson
 import com.example.timetable.data.datenmodell.LessonSelection
 import com.example.timetable.data.datenmodell.UserSchedulePreferences
+import com.example.timetable.data.UserSchedulePreferencesStore
 
 class UserTimetableService(
     private val repository: TimetableRepository,

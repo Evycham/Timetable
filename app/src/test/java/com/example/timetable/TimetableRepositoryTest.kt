@@ -1,7 +1,7 @@
 package com.example.timetable
 
 import com.example.timetable.data.services.DaVinciApi
-import com.example.timetable.data.services.TimetableRepository
+import com.example.timetable.data.TimetableRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

@@ -1,8 +1,12 @@
-package com.example.timetable.data.services
+package com.example.timetable.data
 
 import com.example.timetable.data.datenmodell.CalenderDay
+import com.example.timetable.data.datenmodell.DaVinciResponse
 import com.example.timetable.data.datenmodell.Event
 import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.data.services.CalenderDayMapper
+import com.example.timetable.data.services.DaVinciApi
+import com.example.timetable.data.services.LessonParser
 import java.io.File
 
 class TimetableRepository(
@@ -149,7 +153,7 @@ class TimetableRepository(
         calenderDays = emptyList()
     }
 
-    private fun applyResponse(response: com.example.timetable.data.datenmodell.DaVinciResponse): List<CalenderDay> {
+    private fun applyResponse(response: DaVinciResponse): List<CalenderDay> {
         lessons = parser.parseLessons(response.lessonTimes)
         events = parser.parseEvents(response.eventTimes)
         calenderDays = CalenderDayMapper.build(lessons, events)

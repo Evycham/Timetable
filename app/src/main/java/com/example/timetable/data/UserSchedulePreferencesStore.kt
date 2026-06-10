@@ -1,4 +1,4 @@
-package com.example.timetable.data.services
+package com.example.timetable.data
 
 import com.example.timetable.data.datenmodell.HiddenLessonRule
 import com.example.timetable.data.datenmodell.LessonSelection

@@ -4,7 +4,7 @@ import com.example.timetable.data.datenmodell.Event
 import com.example.timetable.data.datenmodell.Lesson
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.UUID
+import java.security.MessageDigest
 
 class LessonParser {
 
@@ -46,9 +46,19 @@ class LessonParser {
 
         val lessons = linkedSetOf<Lesson>()
         for (date in dates) {
+            val lessonId = buildLessonId(
+                title = title,
+                date = date,
+                startTime = startTime,
+                endTime = endTime,
+                rooms = rooms,
+                building = building,
+                teachers = teachers,
+                groupsCode = groupsCode
+            )
             lessons.add(
                 Lesson(
-                    id = UUID.randomUUID().toString(),
+                    id = lessonId,
                     title = title,
                     date = date,
                     startTime = startTime,
@@ -62,6 +72,32 @@ class LessonParser {
             )
         }
         return lessons
+    }
+
+    private fun buildLessonId(
+        title: String,
+        date: String,
+        startTime: String,
+        endTime: String,
+        rooms: Set<String>,
+        building: String?,
+        teachers: Set<String>,
+        groupsCode: Set<String>
+    ): String {
+        val rawKey = listOf(
+            title,
+            date,
+            startTime,
+            endTime,
+            building.orEmpty(),
+            rooms.sorted().joinToString("|"),
+            teachers.sorted().joinToString("|"),
+            groupsCode.sorted().joinToString("|")
+        ).joinToString("#")
+
+        return MessageDigest.getInstance("SHA-256")
+            .digest(rawKey.toByteArray())
+            .joinToString("") { byte -> "%02x".format(byte) }
     }
 
     /**

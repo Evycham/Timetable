@@ -64,6 +64,29 @@ class LessonParserTest {
     }
 
     @Test
+    fun parseLesson_createsStableIds_forSameInput() {
+        val lessonJson = JSONObject(
+            """
+            {
+              "courseTitle": "Mathe",
+              "dates": ["20260518"],
+              "startTime": "0945",
+              "endTime": "1115",
+              "classCodes": ["mb-MBB_4"],
+              "teacherCodes": ["dozent-1"],
+              "roomCodes": ["4/302"],
+              "buildingCodes": ["H4"]
+            }
+            """.trimIndent()
+        )
+
+        val firstId = parser.parseLesson(lessonJson).first().id
+        val secondId = parser.parseLesson(lessonJson).first().id
+
+        assertEquals(firstId, secondId)
+    }
+
+    @Test
     fun parseLesson_returnsEmptySet_whenRequiredFieldsAreMissing() {
         val lessonWithoutTitle = JSONObject(
             """

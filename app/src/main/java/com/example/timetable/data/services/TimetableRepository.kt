@@ -93,6 +93,15 @@ class TimetableRepository(
         lessons.filter { groupsCode in it.groupsCode }
 
     /**
+     * Sucht eine Lesson ueber ihre stabile ID.
+     *
+     * @param lessonId Die gesuchte Lesson-ID.
+     * @return Die passende Lesson oder `null`.
+     */
+    fun getLessonById(lessonId: String): Lesson? =
+        lessons.firstOrNull { it.id == lessonId }
+
+    /**
      * Filtert Lessons nach Titel und Studiengangs- oder Gruppencode.
      *
      * @param title Der gesuchte Lesson-Titel.

@@ -8,7 +8,7 @@ data class Lesson(
     val date: String,
     val startTime: String,
     val endTime: String,
-    val rooms: Set<String>,
+    val rooms: Set<String>?,
     val building: String?,
     val teacher: Set<String>?,
     val groupsCode: Set<String>,

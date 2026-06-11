@@ -33,9 +33,6 @@ android {
     buildFeatures {
         compose = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.11"
-    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -61,5 +58,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.text.google.fonts)
+    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.navigation.compose)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4.android)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
     // --- UI END ---
 }

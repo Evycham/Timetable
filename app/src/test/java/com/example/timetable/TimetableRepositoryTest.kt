@@ -11,20 +11,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.robolectric.RobolectricTestRunner
 import org.junit.runner.RunWith
-import java.nio.file.Files
+import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class TimetableRepositoryTest {
 
     @Test
     fun initialize_downloadsParsesAndPersists_whenNoLocalDataExists() = runBlocking {
-        val tempDir = Files.createTempDirectory("timetable-repository-test").toFile()
         val database = createDatabase()
         val repository = TimetableRepository(
             context = applicationContext(),
-            storageDir = tempDir,
             api = DaVinciApi(downloader = { firstJson() }),
             database = database
         )
@@ -35,26 +32,22 @@ class TimetableRepositoryTest {
         assertEquals(2, repository.getAllLessons().size)
         assertEquals(1, repository.getAllEvents().size)
         assertEquals(2, repository.getLessonsByGroupsCode("mb-MBB_4").size)
-        assertTrue(tempDir.resolve(DaVinciApi.RAW_CACHE_FILE_NAME).exists())
 
         database.close()
     }
 
     @Test
     fun initialize_usesExistingDatabase_withoutDownloadingAgain() = runBlocking {
-        val tempDir = Files.createTempDirectory("timetable-repository-test").toFile()
         val database = createDatabase()
 
         TimetableRepository(
             context = applicationContext(),
-            storageDir = tempDir,
             api = DaVinciApi(downloader = { firstJson() }),
             database = database
         ).initialize()
 
         val repository = TimetableRepository(
             context = applicationContext(),
-            storageDir = tempDir,
             api = DaVinciApi(downloader = { error("Downloader should not be used") }),
             database = database
         )
@@ -69,24 +62,16 @@ class TimetableRepositoryTest {
     }
 
     @Test
-    fun loadFromCache_readsExistingRawJson_andPersistsItToDatabase() = runBlocking {
-        val tempDir = Files.createTempDirectory("timetable-repository-test").toFile()
-        val firstDatabase = createDatabase()
-        TimetableRepository(
-            context = applicationContext(),
-            storageDir = tempDir,
-            api = DaVinciApi(downloader = { firstJson() }),
-            database = firstDatabase
-        ).reloadJson()
-        firstDatabase.close()
-
-        val secondDatabase = createDatabase()
+    fun loadFromCache_readsExistingDatabase_withoutDownloadingAgain() = runBlocking {
+        val database = createDatabase()
         val repository = TimetableRepository(
             context = applicationContext(),
-            storageDir = tempDir,
-            api = DaVinciApi(downloader = { error("Downloader should not be used") }),
-            database = secondDatabase
+            api = DaVinciApi(downloader = { firstJson() }),
+            database = database
         )
+
+        repository.reloadJson()
+        repository.clearMemory()
 
         val calenderDays = repository.loadFromCache()
 
@@ -94,16 +79,14 @@ class TimetableRepositoryTest {
         assertEquals(2, repository.getAllLessons().size)
         assertEquals(1, repository.getAllEvents().size)
 
-        secondDatabase.close()
+        database.close()
     }
 
     @Test
     fun updateMethods_replaceWholeJsonAndRefreshQueries() = runBlocking {
-        val tempDir = Files.createTempDirectory("timetable-repository-test").toFile()
         val database = createDatabase()
         val repository = TimetableRepository(
             context = applicationContext(),
-            storageDir = tempDir,
             api = DaVinciApi(downloader = { firstJson() }),
             database = database
         )
@@ -112,7 +95,6 @@ class TimetableRepositoryTest {
 
         val updateRepository = TimetableRepository(
             context = applicationContext(),
-            storageDir = tempDir,
             api = DaVinciApi(downloader = { secondJson() }),
             database = database
         )

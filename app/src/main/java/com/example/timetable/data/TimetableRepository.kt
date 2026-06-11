@@ -3,23 +3,22 @@ package com.example.timetable.data
 import android.content.Context
 import androidx.room.withTransaction
 import com.example.timetable.data.datenmodell.CalenderDay
-import com.example.timetable.data.datenmodell.DaVinciResponse
 import com.example.timetable.data.datenmodell.Event
 import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.data.local.SyncMetadataEntity
 import com.example.timetable.data.local.TimetableDatabase
 import com.example.timetable.data.local.toEntity
 import com.example.timetable.data.local.toModel
 import com.example.timetable.data.services.CalenderDayMapper
 import com.example.timetable.data.services.DaVinciApi
+import com.example.timetable.data.services.DaVinciDownloadSnapshot
 import com.example.timetable.data.services.LessonParser
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import java.io.File
 
 class TimetableRepository(
     context: Context,
-    private val storageDir: File,
     private val api: DaVinciApi = DaVinciApi(),
     private val parser: LessonParser = LessonParser(),
     private val database: TimetableDatabase = TimetableDatabase.getInstance(context)
@@ -27,6 +26,7 @@ class TimetableRepository(
 
     private val lessonDao = database.lessonDao()
     private val eventDao = database.eventDao()
+    private val syncMetadataDao = database.syncMetadataDao()
 
     private var lessons: List<Lesson> = emptyList()
     private var events: List<Event> = emptyList()
@@ -47,58 +47,57 @@ class TimetableRepository(
     /**
      * Initialisiert die lokalen Daten.
      * Wenn bereits eine DB existiert, wird sie verwendet.
-     * Sonst wird erst die lokale Raw-JSON, danach das Netz verwendet.
+     * Sonst wird aus dem Netz geladen und direkt in Room gespeichert.
      *
      * @return Die aktuellen Kalendertage.
      */
     suspend fun initialize(): List<CalenderDay> {
-        if (hasDatabaseData()) {
-            return refreshMemoryFromDatabase()
-        }
-
-        val cachedResponse = api.loadFromCache(storageDir)
-        return if (cachedResponse != null) {
-            persistAndApplyResponse(cachedResponse)
+        return if (hasDatabaseData()) {
+            refreshMemoryFromDatabase()
         } else {
             reloadJson()
         }
     }
 
     /**
-     * Lädt die lokale Raw-JSON-Datei neu, parsed sie und ersetzt den DB-Inhalt.
+     * Lädt den lokalen DB-Cache explizit neu in den Speicher.
      *
-     * @return Die lokalen Kalendertage oder `null`, wenn keine Cache-Datei existiert.
+     * @return Die lokalen Kalendertage oder `null`, wenn die DB noch leer ist.
      */
     suspend fun loadFromCache(): List<CalenderDay>? {
-        val cachedResponse = api.loadFromCache(storageDir) ?: return null
-        return persistAndApplyResponse(cachedResponse)
+        if (!hasDatabaseData()) return null
+        return refreshMemoryFromDatabase()
     }
 
     /**
-     * Lädt die JSON-Datei neu aus dem Netz, ersetzt Raw-Cache und DB und aktualisiert den Speicher.
+     * Lädt die JSON-Datei neu aus dem Netz, parsed sie und ersetzt den DB-Inhalt.
      *
      * @return Die aktualisierten Kalendertage.
      */
     suspend fun reloadJson(): List<CalenderDay> {
-        val response = api.downloadAndSave(storageDir)
-        return persistAndApplyResponse(response)
+        val snapshot = api.downloadSnapshot()
+        return persistAndApplySnapshot(snapshot)
     }
 
     /**
-     * Prüft, ob die Remote-JSON geändert wurde, und aktualisiert bei Bedarf den lokalen Stand.
+     * Prüft, ob sich die Remote-JSON über den gespeicherten Hash geändert hat.
      * Bei einem Offline-Fehler bleibt der letzte DB-Stand verfügbar.
      *
      * @return `true`, wenn neue Daten gespeichert wurden, sonst `false`.
      */
     suspend fun updateJsonIfNeeded(): Boolean {
         return try {
-            val result = api.checkForUpdates(storageDir)
-            if (result.hasUpdates || !hasDatabaseData()) {
-                persistAndApplyResponse(result.response)
+            val snapshot = api.downloadSnapshot()
+            val currentMetadata = syncMetadataDao.get()
+            val hasUpdates = currentMetadata?.jsonHash != snapshot.jsonHash || !hasDatabaseData()
+
+            if (hasUpdates) {
+                persistAndApplySnapshot(snapshot)
             } else {
                 refreshMemoryFromDatabase()
             }
-            result.hasUpdates
+
+            hasUpdates
         } catch (exception: Exception) {
             if (hasDatabaseData()) {
                 refreshMemoryFromDatabase()
@@ -109,87 +108,32 @@ class TimetableRepository(
         }
     }
 
-    /**
-     * Gibt alle aktuell geladenen Lessons zurück.
-     *
-     * @return Alle Lessons im Speicher.
-     */
     fun getAllLessons(): List<Lesson> = lessons
 
-    /**
-     * Gibt alle aktuell geladenen Events zurück.
-     *
-     * @return Alle Events im Speicher.
-     */
     fun getAllEvents(): List<Event> = events
 
-    /**
-     * Gibt alle aktuell geladenen Kalendertage zurück.
-     *
-     * @return Alle Kalendertage im Speicher.
-     */
     fun getAllCalenderDays(): List<CalenderDay> = calenderDays
 
-    /**
-     * Filtert Lessons nach einem Studiengangs- oder Gruppencode.
-     *
-     * @param groupsCode Der gesuchte Studiengangs- oder Gruppencode.
-     * @return Alle passenden Lessons.
-     */
     fun getLessonsByGroupsCode(groupsCode: String): List<Lesson> =
         lessons.filter { groupsCode in it.groupsCode }
 
-    /**
-     * Sucht eine Lesson ueber ihre stabile ID.
-     *
-     * @param lessonId Die gesuchte Lesson-ID.
-     * @return Die passende Lesson oder `null`.
-     */
     fun getLessonById(lessonId: String): Lesson? =
         lessons.firstOrNull { it.id == lessonId }
 
-    /**
-     * Filtert Lessons nach Titel und Studiengangs- oder Gruppencode.
-     *
-     * @param title Der gesuchte Lesson-Titel.
-     * @param groupsCode Der gesuchte Studiengangs- oder Gruppencode.
-     * @return Alle passenden Lessons.
-     */
     fun getLessonsByTitleAndGroupsCode(title: String, groupsCode: String): List<Lesson> =
         lessons.filter { lesson ->
             lesson.title == title && groupsCode in lesson.groupsCode
         }
 
-    /**
-     * Gibt alle Lessons für ein bestimmtes Datum zurück.
-     *
-     * @param date Datum im Format `YYYY-MM-DD`.
-     * @return Alle Lessons des Tages.
-     */
     fun getLessonsByDate(date: String): List<Lesson> =
         lessons.filter { it.date == date }.sortedBy { it.startTime }
 
-    /**
-     * Gibt alle Events für ein bestimmtes Datum zurück.
-     *
-     * @param date Datum im Format `YYYY-MM-DD`.
-     * @return Alle Events des Tages.
-     */
     fun getEventsByDate(date: String): List<Event> =
         calenderDays.firstOrNull { it.date == date }?.events.orEmpty()
 
-    /**
-     * Gibt einen einzelnen Kalendertag zurück.
-     *
-     * @param date Datum im Format `YYYY-MM-DD`.
-     * @return Den passenden Kalendertag oder `null`.
-     */
     fun getCalenderDay(date: String): CalenderDay? =
         calenderDays.firstOrNull { it.date == date }
 
-    /**
-     * Löscht nur den geladenen Speicherzustand, nicht DB oder Datei.
-     */
     fun clearMemory() {
         lessons = emptyList()
         events = emptyList()
@@ -205,9 +149,9 @@ class TimetableRepository(
         return applyModels(dbLessons, dbEvents)
     }
 
-    private suspend fun persistAndApplyResponse(response: DaVinciResponse): List<CalenderDay> {
-        val parsedLessons = parser.parseLessons(response.lessonTimes)
-        val parsedEvents = parser.parseEvents(response.eventTimes)
+    private suspend fun persistAndApplySnapshot(snapshot: DaVinciDownloadSnapshot): List<CalenderDay> {
+        val parsedLessons = parser.parseLessons(snapshot.response.lessonTimes)
+        val parsedEvents = parser.parseEvents(snapshot.response.eventTimes)
 
         database.withTransaction {
             lessonDao.clear()
@@ -218,6 +162,13 @@ class TimetableRepository(
             if (parsedEvents.isNotEmpty()) {
                 eventDao.insertAll(parsedEvents.map { event -> event.toEntity() })
             }
+            syncMetadataDao.upsert(
+                SyncMetadataEntity(
+                    jsonHash = snapshot.jsonHash,
+                    jsonSize = snapshot.jsonSize,
+                    syncedAtMillis = System.currentTimeMillis()
+                )
+            )
         }
 
         return applyModels(parsedLessons, parsedEvents)

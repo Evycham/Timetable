@@ -2,56 +2,49 @@ package com.example.timetable
 
 import com.example.timetable.data.services.DaVinciApi
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.file.Files
 
 class DaVinciApiLocalTest {
 
     @Test
-    fun downloadAndSave_writesRawJsonToCacheFile() {
-        val tempDir = Files.createTempDirectory("davinci-api-test").toFile()
-        val api = DaVinciApi(downloader = { sampleJson(lessonCount = 2, eventCount = 1) })
-
-        val response = api.downloadAndSave(tempDir)
-        val cacheFile = tempDir.resolve(DaVinciApi.RAW_CACHE_FILE_NAME)
-
-        assertTrue(cacheFile.exists())
-        assertTrue(cacheFile.readText().isNotBlank())
-        assertEquals(2, response.lessonTimes.length())
-        assertEquals(1, response.eventTimes.length())
-    }
-
-    @Test
-    fun checkForUpdates_returnsFalse_whenRawJsonIsUnchanged() {
-        val tempDir = Files.createTempDirectory("davinci-api-test").toFile()
-        val json = sampleJson(lessonCount = 1, eventCount = 1)
+    fun downloadSnapshot_returnsParsedResponseWithHashAndSize() {
+        val json = sampleJson(lessonCount = 2, eventCount = 1)
         val api = DaVinciApi(downloader = { json })
 
-        api.downloadAndSave(tempDir)
-        val result = api.checkForUpdates(tempDir)
+        val snapshot = api.downloadSnapshot()
 
-        assertFalse(result.hasUpdates)
-        assertEquals(result.oldFileSize, result.newFileSize)
-        assertEquals(1, result.response.lessonTimes.length())
-        assertEquals(1, result.response.eventTimes.length())
+        assertEquals(json, snapshot.rawJson)
+        assertEquals(json.toByteArray(Charsets.UTF_8).size.toLong(), snapshot.jsonSize)
+        assertTrue(snapshot.jsonHash.isNotBlank())
+        assertEquals(2, snapshot.response.lessonTimes.length())
+        assertEquals(1, snapshot.response.eventTimes.length())
     }
 
     @Test
-    fun checkForUpdates_overwritesCache_whenJsonChanged() {
-        val tempDir = Files.createTempDirectory("davinci-api-test").toFile()
+    fun downloadSnapshot_returnsStableHash_forSameJson() {
+        val json = sampleJson(lessonCount = 1, eventCount = 1)
+
+        val first = DaVinciApi(downloader = { json }).downloadSnapshot()
+        val second = DaVinciApi(downloader = { json }).downloadSnapshot()
+
+        assertEquals(first.jsonHash, second.jsonHash)
+        assertEquals(first.jsonSize, second.jsonSize)
+    }
+
+    @Test
+    fun downloadSnapshot_returnsDifferentHash_forChangedJson() {
         val firstJson = sampleJson(lessonCount = 1, eventCount = 1)
         val secondJson = sampleJson(lessonCount = 3, eventCount = 2)
 
-        DaVinciApi(downloader = { firstJson }).downloadAndSave(tempDir)
-        val result = DaVinciApi(downloader = { secondJson }).checkForUpdates(tempDir)
+        val first = DaVinciApi(downloader = { firstJson }).downloadSnapshot()
+        val second = DaVinciApi(downloader = { secondJson }).downloadSnapshot()
 
-        assertTrue(result.hasUpdates)
-        assertTrue(result.cacheFile.exists())
-        assertEquals(3, result.response.lessonTimes.length())
-        assertEquals(2, result.response.eventTimes.length())
-        assertEquals(secondJson, result.cacheFile.readText())
+        assertNotEquals(first.jsonHash, second.jsonHash)
+        assertNotEquals(first.jsonSize, second.jsonSize)
+        assertEquals(3, second.response.lessonTimes.length())
+        assertEquals(2, second.response.eventTimes.length())
     }
 
     private fun sampleJson(lessonCount: Int, eventCount: Int): String {

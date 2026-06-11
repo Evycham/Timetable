@@ -26,7 +26,6 @@ class UserTimetableServiceTest {
         val database = createDatabase()
         val repository = TimetableRepository(
             context = applicationContext(),
-            storageDir = tempDir,
             api = DaVinciApi(downloader = { sampleJson() }),
             database = database
         )

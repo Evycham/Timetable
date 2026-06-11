@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
 @Database(
-    entities = [LessonEntity::class, EventEntity::class],
+    entities = [LessonEntity::class, EventEntity::class, SyncMetadataEntity::class],
     version = 1,
     exportSchema = false
 )
@@ -17,6 +17,8 @@ abstract class TimetableDatabase : RoomDatabase() {
     abstract fun lessonDao(): LessonDao
 
     abstract fun eventDao(): EventDao
+
+    abstract fun syncMetadataDao(): SyncMetadataDao
 
     companion object {
         private const val DATABASE_NAME = "timetable.db"

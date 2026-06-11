@@ -1,4 +1,4 @@
-package com.example.timetable.data
+package com.example.timetable.data.datenmodell
 
 import java.util.UUID
 
@@ -20,14 +20,6 @@ data class Lesson(
         val modified: String?
     )
 }
-
-data class HolidayEvent(
-    val id: String? = null,
-    val title: String,
-    val startDate: String,
-    val endDate: String,
-    val category: String? = null,
-)
 
 /**
  * Testdaten
@@ -93,23 +85,6 @@ object LessonSamples {
                 reasonType = "teacherAbsence",
                 modified = "2026-04-07"
             )
-        )
-    )
-
-    val localHolidayEvents = listOf(
-        HolidayEvent(
-            id = "event-001",
-            title = "Sommerferien",
-            startDate = "2026-07-20",
-            endDate = "2026-08-31",
-            category = "Ferien",
-        ),
-        HolidayEvent(
-            id = "event-002",
-            title = "Tag der Deutschen Einheit",
-            startDate = "2026-10-03",
-            endDate = "2026-10-03",
-            category = "Feiertag",
         )
     )
 }

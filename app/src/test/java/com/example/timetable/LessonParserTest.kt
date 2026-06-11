@@ -1,7 +1,7 @@
 package com.example.timetable
 
-import com.example.timetable.data.Lesson
-import com.example.timetable.data.LessonParser
+import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.data.services.LessonParser
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals

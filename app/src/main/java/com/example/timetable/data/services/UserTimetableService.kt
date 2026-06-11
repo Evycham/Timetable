@@ -1,13 +1,14 @@
 package com.example.timetable.data.services
 
 import com.example.timetable.data.TimetableRepository
+import com.example.timetable.data.UserSchedulePreferencesStore
 import com.example.timetable.data.datenmodell.CalenderDay
 import com.example.timetable.data.datenmodell.HiddenLessonRule
 import com.example.timetable.data.datenmodell.Lesson
 import com.example.timetable.data.datenmodell.LessonSelection
 import com.example.timetable.data.datenmodell.UserSchedulePreferences
-import com.example.timetable.data.UserSchedulePreferencesStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 class UserTimetableService(
@@ -18,11 +19,13 @@ class UserTimetableService(
     val preferencesFlow: Flow<UserSchedulePreferences> = preferencesStore.preferencesFlow
 
     fun userLessonsFlow(): Flow<List<Lesson>> =
-        preferencesFlow.map(::buildUserLessonsForPreferences)
+        combine(preferencesFlow, repository.lessonsFlow) { preferences, repositoryLessons ->
+            buildUserLessonsForPreferences(preferences, repositoryLessons)
+        }
 
     fun userCalenderDaysFlow(): Flow<List<CalenderDay>> =
-        userLessonsFlow().map { lessons ->
-            CalenderDayMapper.build(lessons, repository.getAllEvents())
+        combine(userLessonsFlow(), repository.eventsFlow) { lessons, events ->
+            CalenderDayMapper.build(lessons, events)
         }
 
     suspend fun getPreferences(): UserSchedulePreferences = preferencesStore.load()
@@ -133,7 +136,7 @@ class UserTimetableService(
     }
 
     suspend fun buildUserLessons(): List<Lesson> =
-        buildUserLessonsForPreferences(preferencesStore.load())
+        buildUserLessonsForPreferences(preferencesStore.load(), repository.getAllLessons())
 
     suspend fun buildUserCalenderDays(): List<CalenderDay> =
         CalenderDayMapper.build(buildUserLessons(), repository.getAllEvents())
@@ -142,11 +145,16 @@ class UserTimetableService(
         preferencesStore.clear()
     }
 
-    private fun buildUserLessonsForPreferences(preferences: UserSchedulePreferences): List<Lesson> {
+    private fun buildUserLessonsForPreferences(
+        preferences: UserSchedulePreferences,
+        repositoryLessons: List<Lesson>
+    ): List<Lesson> {
         val baseLessons = preferences.groupsCode
-            ?.let(repository::getLessonsByGroupsCode)
+            ?.let { groupsCode -> repositoryLessons.filter { lesson -> groupsCode in lesson.groupsCode } }
             .orEmpty()
-        val extraLessons = preferences.extraLessons.flatMap(::resolveLessonSelection)
+        val extraLessons = preferences.extraLessons.flatMap { selection ->
+            resolveLessonSelection(selection, repositoryLessons)
+        }
 
         return (baseLessons + extraLessons)
             .distinctBy(Lesson::id)
@@ -154,19 +162,23 @@ class UserTimetableService(
             .sortedWith(compareBy<Lesson> { it.date }.thenBy { it.startTime })
     }
 
-    private fun resolveLessonSelection(selection: LessonSelection): List<Lesson> {
+    private fun resolveLessonSelection(
+        selection: LessonSelection,
+        repositoryLessons: List<Lesson>
+    ): List<Lesson> {
         val lessonId = selection.lessonId
         if (lessonId != null) {
-            return repository.getLessonById(lessonId)?.let(::listOf).orEmpty()
+            return repositoryLessons.firstOrNull { lesson -> lesson.id == lessonId }
+                ?.let(::listOf)
+                .orEmpty()
         }
 
         val title = selection.title
         val groupsCode = selection.groupsCode
         if (title != null && groupsCode != null) {
-            return repository.getLessonsByTitleAndGroupsCode(
-                title = title,
-                groupsCode = groupsCode
-            )
+            return repositoryLessons.filter { lesson ->
+                lesson.title == title && groupsCode in lesson.groupsCode
+            }
         }
 
         return emptyList()

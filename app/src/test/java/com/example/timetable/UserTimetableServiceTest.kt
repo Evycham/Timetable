@@ -1,24 +1,34 @@
 package com.example.timetable
 
-import com.example.timetable.data.services.DaVinciApi
+import android.content.Context
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
 import com.example.timetable.data.TimetableRepository
 import com.example.timetable.data.UserSchedulePreferencesStore
+import com.example.timetable.data.local.TimetableDatabase
+import com.example.timetable.data.services.DaVinciApi
 import com.example.timetable.data.services.UserTimetableService
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import java.nio.file.Files
 
+@RunWith(RobolectricTestRunner::class)
 class UserTimetableServiceTest {
 
     @Test
     fun buildUserLessons_usesGroupsCode_extraLessons_andHiddenRules() = runBlocking {
         val tempDir = Files.createTempDirectory("user-timetable-service-test").toFile()
+        val database = createDatabase()
         val repository = TimetableRepository(
+            context = applicationContext(),
             storageDir = tempDir,
-            api = DaVinciApi(downloader = { sampleJson() })
+            api = DaVinciApi(downloader = { sampleJson() }),
+            database = database
         )
         repository.initialize()
 
@@ -42,6 +52,8 @@ class UserTimetableServiceTest {
         assertEquals(listOf("Mathe", "Informatik"), userLessons.map { it.title })
         assertEquals(listOf("2026-05-19", "2026-05-20"), userDays.map { it.date })
         assertTrue(userDays.any { day -> day.events.isNotEmpty() })
+
+        database.close()
     }
 
     private fun createPreferencesStore(tempDir: java.io.File): UserSchedulePreferencesStore {
@@ -50,6 +62,14 @@ class UserTimetableServiceTest {
         )
         return UserSchedulePreferencesStore(dataStore)
     }
+
+    private fun createDatabase(): TimetableDatabase =
+        Room.inMemoryDatabaseBuilder(
+            applicationContext(),
+            TimetableDatabase::class.java
+        ).allowMainThreadQueries().build()
+
+    private fun applicationContext(): Context = ApplicationProvider.getApplicationContext()
 
     private fun sampleJson(): String = """
         {

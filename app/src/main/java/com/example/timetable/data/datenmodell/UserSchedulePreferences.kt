@@ -13,6 +13,7 @@ data class HiddenLessonRule(
 )
 
 data class UserSchedulePreferences(
+    val isSetupComplete: Boolean = false,
     val groupsCode: String? = null,
     val extraLessons: Set<LessonSelection> = emptySet(),
     val hiddenLessons: Set<HiddenLessonRule> = emptySet()

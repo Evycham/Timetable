@@ -7,99 +7,151 @@ import com.example.timetable.data.datenmodell.Lesson
 import com.example.timetable.data.datenmodell.LessonSelection
 import com.example.timetable.data.datenmodell.UserSchedulePreferences
 import com.example.timetable.data.UserSchedulePreferencesStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 class UserTimetableService(
     private val repository: TimetableRepository,
     private val preferencesStore: UserSchedulePreferencesStore
 ) {
 
-    fun getPreferences(): UserSchedulePreferences = preferencesStore.load()
+    val preferencesFlow: Flow<UserSchedulePreferences> = preferencesStore.preferencesFlow
 
-    fun setGroupsCode(groupsCode: String) {
-        val current = preferencesStore.load()
-        preferencesStore.save(current.copy(groupsCode = groupsCode))
+    fun userLessonsFlow(): Flow<List<Lesson>> =
+        preferencesFlow.map(::buildUserLessonsForPreferences)
+
+    fun userCalenderDaysFlow(): Flow<List<CalenderDay>> =
+        userLessonsFlow().map { lessons ->
+            CalenderDayMapper.build(lessons, repository.getAllEvents())
+        }
+
+    suspend fun getPreferences(): UserSchedulePreferences = preferencesStore.load()
+
+    suspend fun setSetupComplete(isSetupComplete: Boolean) {
+        preferencesStore.update { current ->
+            current.copy(isSetupComplete = isSetupComplete)
+        }
     }
 
-    fun addExtraLesson(groupsCode: String, title: String) {
-        val current = preferencesStore.load()
-        val updated = current.extraLessons + LessonSelection(groupsCode = groupsCode, title = title)
-        preferencesStore.save(current.copy(extraLessons = updated))
+    suspend fun setGroupsCode(groupsCode: String) {
+        preferencesStore.update { current ->
+            current.copy(groupsCode = groupsCode)
+        }
     }
 
-    fun addExtraLessonById(lessonId: String) {
-        val current = preferencesStore.load()
-        val updated = current.extraLessons + LessonSelection(lessonId = lessonId)
-        preferencesStore.save(current.copy(extraLessons = updated))
+    suspend fun completeSetup(groupsCode: String) {
+        preferencesStore.update { current ->
+            current.copy(
+                isSetupComplete = true,
+                groupsCode = groupsCode
+            )
+        }
     }
 
-    fun removeExtraLesson(groupsCode: String, title: String) {
-        val current = preferencesStore.load()
-        val updated = current.extraLessons - LessonSelection(groupsCode = groupsCode, title = title)
-        preferencesStore.save(current.copy(extraLessons = updated))
+    suspend fun addExtraLesson(groupsCode: String, title: String) {
+        preferencesStore.update { current ->
+            current.copy(
+                extraLessons = current.extraLessons + LessonSelection(
+                    groupsCode = groupsCode,
+                    title = title
+                )
+            )
+        }
     }
 
-    fun removeExtraLessonById(lessonId: String) {
-        val current = preferencesStore.load()
-        val updated = current.extraLessons - LessonSelection(lessonId = lessonId)
-        preferencesStore.save(current.copy(extraLessons = updated))
+    suspend fun addExtraLessonById(lessonId: String) {
+        preferencesStore.update { current ->
+            current.copy(
+                extraLessons = current.extraLessons + LessonSelection(lessonId = lessonId)
+            )
+        }
     }
 
-    fun hideLesson(groupsCode: String, title: String) {
-        val current = preferencesStore.load()
-        val updated = current.hiddenLessons + HiddenLessonRule(title = title, groupsCode = groupsCode)
-        preferencesStore.save(current.copy(hiddenLessons = updated))
+    suspend fun removeExtraLesson(groupsCode: String, title: String) {
+        preferencesStore.update { current ->
+            current.copy(
+                extraLessons = current.extraLessons - LessonSelection(
+                    groupsCode = groupsCode,
+                    title = title
+                )
+            )
+        }
     }
 
-    fun hideLessonById(lessonId: String) {
-        val current = preferencesStore.load()
-        val updated = current.hiddenLessons + HiddenLessonRule(lessonId = lessonId)
-        preferencesStore.save(current.copy(hiddenLessons = updated))
+    suspend fun removeExtraLessonById(lessonId: String) {
+        preferencesStore.update { current ->
+            current.copy(
+                extraLessons = current.extraLessons - LessonSelection(lessonId = lessonId)
+            )
+        }
     }
 
-    fun hideAllLessonsByTitle(title: String) {
-        val current = preferencesStore.load()
-        val updated = current.hiddenLessons + HiddenLessonRule(title = title)
-        preferencesStore.save(current.copy(hiddenLessons = updated))
+    suspend fun hideLesson(groupsCode: String, title: String) {
+        preferencesStore.update { current ->
+            current.copy(
+                hiddenLessons = current.hiddenLessons + HiddenLessonRule(
+                    title = title,
+                    groupsCode = groupsCode
+                )
+            )
+        }
     }
 
-    fun showLesson(groupsCode: String, title: String) {
-        val current = preferencesStore.load()
-        val updated = current.hiddenLessons - HiddenLessonRule(title = title, groupsCode = groupsCode)
-        preferencesStore.save(current.copy(hiddenLessons = updated))
+    suspend fun hideLessonById(lessonId: String) {
+        preferencesStore.update { current ->
+            current.copy(
+                hiddenLessons = current.hiddenLessons + HiddenLessonRule(lessonId = lessonId)
+            )
+        }
     }
 
-    fun showLessonById(lessonId: String) {
-        val current = preferencesStore.load()
-        val updated = current.hiddenLessons - HiddenLessonRule(lessonId = lessonId)
-        preferencesStore.save(current.copy(hiddenLessons = updated))
+    suspend fun showLesson(groupsCode: String, title: String) {
+        preferencesStore.update { current ->
+            current.copy(
+                hiddenLessons = current.hiddenLessons - HiddenLessonRule(
+                    title = title,
+                    groupsCode = groupsCode
+                )
+            )
+        }
     }
 
-    fun showAllLessonsByTitle(title: String) {
-        val current = preferencesStore.load()
-        val updated = current.hiddenLessons - HiddenLessonRule(title = title)
-        preferencesStore.save(current.copy(hiddenLessons = updated))
+    suspend fun showLessonById(lessonId: String) {
+        preferencesStore.update { current ->
+            current.copy(
+                hiddenLessons = current.hiddenLessons - HiddenLessonRule(lessonId = lessonId)
+            )
+        }
     }
 
-    fun buildUserLessons(): List<Lesson> {
-        val preferences = preferencesStore.load()
+    suspend fun showAllLessonsByTitle(title: String) {
+        preferencesStore.update { current ->
+            current.copy(
+                hiddenLessons = current.hiddenLessons - HiddenLessonRule(title = title)
+            )
+        }
+    }
+
+    suspend fun buildUserLessons(): List<Lesson> =
+        buildUserLessonsForPreferences(preferencesStore.load())
+
+    suspend fun buildUserCalenderDays(): List<CalenderDay> =
+        CalenderDayMapper.build(buildUserLessons(), repository.getAllEvents())
+
+    suspend fun clearPreferences() {
+        preferencesStore.clear()
+    }
+
+    private fun buildUserLessonsForPreferences(preferences: UserSchedulePreferences): List<Lesson> {
         val baseLessons = preferences.groupsCode
             ?.let(repository::getLessonsByGroupsCode)
             .orEmpty()
-        val extraLessons = preferences.extraLessons.flatMap { selection ->
-            resolveLessonSelection(selection)
-        }
+        val extraLessons = preferences.extraLessons.flatMap(::resolveLessonSelection)
 
         return (baseLessons + extraLessons)
             .distinctBy(Lesson::id)
             .filterNot { lesson -> isHidden(lesson, preferences.hiddenLessons) }
             .sortedWith(compareBy<Lesson> { it.date }.thenBy { it.startTime })
-    }
-
-    fun buildUserCalenderDays(): List<CalenderDay> =
-        CalenderDayMapper.build(buildUserLessons(), repository.getAllEvents())
-
-    fun clearPreferences() {
-        preferencesStore.clear()
     }
 
     private fun resolveLessonSelection(selection: LessonSelection): List<Lesson> {

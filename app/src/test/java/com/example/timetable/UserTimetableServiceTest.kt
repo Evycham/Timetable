@@ -4,6 +4,8 @@ import com.example.timetable.data.services.DaVinciApi
 import com.example.timetable.data.TimetableRepository
 import com.example.timetable.data.UserSchedulePreferencesStore
 import com.example.timetable.data.services.UserTimetableService
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,7 +14,7 @@ import java.nio.file.Files
 class UserTimetableServiceTest {
 
     @Test
-    fun buildUserLessons_usesGroupsCode_extraLessons_andHiddenRules() {
+    fun buildUserLessons_usesGroupsCode_extraLessons_andHiddenRules() = runBlocking {
         val tempDir = Files.createTempDirectory("user-timetable-service-test").toFile()
         val repository = TimetableRepository(
             storageDir = tempDir,
@@ -20,23 +22,33 @@ class UserTimetableServiceTest {
         )
         repository.initialize()
 
-        val preferencesStore = UserSchedulePreferencesStore(tempDir)
+        val preferencesStore = createPreferencesStore(tempDir)
         val userService = UserTimetableService(repository, preferencesStore)
         val matheLessons = repository.getLessonsByTitleAndGroupsCode("Mathe", "mb-MBB_4").sortedBy { it.date }
         val informatikLesson = repository.getLessonsByTitleAndGroupsCode("Informatik", "eti-SKIB_4").first()
 
         userService.setGroupsCode("mb-MBB_4")
+        userService.setSetupComplete(true)
         userService.addExtraLessonById(informatikLesson.id)
         userService.hideLessonById(matheLessons.first().id)
 
         val userLessons = userService.buildUserLessons()
         val userDays = userService.buildUserCalenderDays()
+        val preferences = userService.getPreferences()
 
+        assertTrue(preferences.isSetupComplete)
         assertEquals(2, repository.getLessonsByTitleAndGroupsCode("Mathe", "mb-MBB_4").size)
         assertEquals(2, userLessons.size)
         assertEquals(listOf("Mathe", "Informatik"), userLessons.map { it.title })
         assertEquals(listOf("2026-05-19", "2026-05-20"), userDays.map { it.date })
         assertTrue(userDays.any { day -> day.events.isNotEmpty() })
+    }
+
+    private fun createPreferencesStore(tempDir: java.io.File): UserSchedulePreferencesStore {
+        val dataStore = PreferenceDataStoreFactory.create(
+            produceFile = { tempDir.resolve("user-timetable.preferences_pb") }
+        )
+        return UserSchedulePreferencesStore(dataStore)
     }
 
     private fun sampleJson(): String = """

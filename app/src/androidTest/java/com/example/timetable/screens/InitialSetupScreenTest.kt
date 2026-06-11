@@ -2,7 +2,6 @@ package com.example.timetable.screens
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -33,9 +32,10 @@ class InitialSetupScreenTest {
         }
 
         composeTestRule.onNodeWithText("HOSTvinci").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Dein übersichtlicher Stundenplan für die HOST.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Dein übersichtlicher Stundenplan für die HOST.")
+            .assertIsDisplayed()
         composeTestRule.onNodeWithText("Fakultät auswählen").assertIsDisplayed()
-        
+
         Faculty.entries.forEach { faculty ->
             composeTestRule.onNodeWithText(faculty.label).assertIsDisplayed()
         }
@@ -52,8 +52,9 @@ class InitialSetupScreenTest {
 
         // Verifiziert den Wechsel in die Studiengang-Ansicht
         composeTestRule.onNodeWithText(targetFaculty.label).assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Zurück zur Fakultätsauswahl").assertIsDisplayed()
-        
+        composeTestRule.onNodeWithContentDescription("Zurück zur Fakultätsauswahl")
+            .assertIsDisplayed()
+
         // Suchfeld sollte nun sichtbar sein
         composeTestRule.onNodeWithTag("courseSearchField").assertIsDisplayed()
     }
@@ -78,12 +79,12 @@ class InitialSetupScreenTest {
         // 1. Fakultät wählen
         val faculty = Faculty.WS
         composeTestRule.onNodeWithText(faculty.label).performClick()
-        
+
         // 2. Suche bedienen
-        composeTestRule.onNodeWithTag("courseSearchField").performTextInput("WIB")
+        composeTestRule.onNodeWithTag("courseSearchField").performTextInput("Stat")
 
         // 3. Studiengang auswählen (neu benötigt in der UI)
-        composeTestRule.onNodeWithText("${faculty.prefix} - Bachelor (B.Sc.)").performClick()
+        composeTestRule.onNodeWithText("ws-Stat I Ü").performClick()
 
         // 4. Den "Stundenplan anzeigen" Button klicken
         composeTestRule.onNodeWithTag("setupContinueButton").performClick()

@@ -1,206 +1,282 @@
 package com.example.timetable.view.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarViewDay
+import androidx.compose.material.icons.filled.CalendarViewWeek
+import androidx.compose.material.icons.filled.Settings
+import com.example.timetable.view.components.timetable.LiveUpdateBanner
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.timetable.view.components.EventDetailOverlay
-import com.example.timetable.view.components.TimetableGrid
-import com.example.timetable.view.components.TimetableLessonCard
+import com.example.timetable.view.components.timetable.DailyView
+import com.example.timetable.view.components.timetable.EventDetailOverlay
+import com.example.timetable.view.components.timetable.TimetableGrid
 import com.example.timetable.view.json.JsonLesson
 import com.example.timetable.view.json.JsonLessonRepository
+import com.example.timetable.view.json.MockLogic
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.LocalTime
 
+/**
+ * Bestimmt das Anzeigeformat des Stundenplans auf dem Bildschirm.
+ */
 enum class TimetableViewMode {
     DAILY, WEEKLY
 }
 
+private const val INITIAL_PAGE = 500
+private const val PAGE_COUNT = 1000
+
+/**
+ * Der Hauptbildschirm für die Anzeige des Stundenplans.
+ * Unterstützt die Umschaltung zwischen der Tagesansicht (Heute) und der Wochenansicht (Woche),
+ * das Filtern und Suchen von Modulen, den Schnellzugriff auf Einstellungen sowie die Anzeige
+ * von aktuellen Ausfall- und Raumhinweisen über ein interaktives Banner.
+ *
+ * @param courseName Name des ausgewählten Studiengangs oder Kurses.
+ * @param onNavigateBack Callback-Methode zur Rückkehr zur vorherigen Ansicht.
+ * @param onNavigateToCourseSelection Callback-Methode zum Öffnen des Modul-Hinzufügen-Bildschirms.
+ * @param onNavigateToSettings Callback-Methode zum Öffnen der App-Einstellungen.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimetableScreen(
     courseName: String,
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onNavigateToCourseSelection: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {}
 ) {
+    // load repository and resolve active lessons from selected modules
     val context = LocalContext.current
     val repository = remember { JsonLessonRepository(context) }
-    val lessons = remember(courseName) { repository.getLessonsByCourse(courseName) }
-    
-    var selectedLesson by remember { mutableStateOf<JsonLesson?>(null) }
-    var viewMode by remember { mutableStateOf(TimetableViewMode.DAILY) }
-    
-    // Group lessons by date
-    val groupedLessons = remember(lessons) {
-        lessons.groupBy { it.date }
+
+    // resolve active faculty color from courseName prefix
+    LaunchedEffect(courseName) {
+        val facultyColor = when {
+            courseName.startsWith("eti-", ignoreCase = true) -> Color(0xff00bfff)
+            courseName.startsWith("mb-", ignoreCase = true) -> Color(0xffffd700)
+            courseName.startsWith("ws-", ignoreCase = true) -> Color(0xff008080)
+            else -> null
+        }
+        MockLogic.activeFacultyColor = facultyColor
     }
 
+    val lessons by remember {
+        derivedStateOf {
+            MockLogic.selectedModuleTitles.flatMap { title ->
+                repository.getLessonsByModuleTitle(title)
+            }
+        }
+    }
+
+    var selectedLesson by remember { mutableStateOf<JsonLesson?>(null) }
+    var viewMode by remember { mutableStateOf(TimetableViewMode.WEEKLY) }
+
+    val scope = rememberCoroutineScope()
+
+    // static baseline reference date for sample dataset
+    val today = LocalDate.of(2026, 6, 15)
+
+    // page controller configuration for swiping days/weeks
+    val dayPagerState = rememberPagerState(
+        initialPage = INITIAL_PAGE,
+        pageCount = { PAGE_COUNT }
+    )
+
+    val weekPagerState = rememberPagerState(
+        initialPage = INITIAL_PAGE,
+        pageCount = { PAGE_COUNT }
+    )
+
+    // filter lessons containing any live updates or cancellations
+    val activeWarning = remember(lessons) {
+        lessons.firstOrNull { it.change != null }?.let {
+            val isCancellation = it.change?.caption?.contains("aus", ignoreCase = true) == true ||
+                    it.change?.message?.contains("aus", ignoreCase = true) == true ||
+                    it.change?.caption?.contains("cancell", ignoreCase = true) == true
+            val msg = it.change?.message?.ifBlank { it.change.caption } ?: it.change?.caption ?: ""
+            Pair(msg, isCancellation)
+        }
+    }
+    var dismissedWarningMessage by remember { mutableStateOf<String?>(null) }
+
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
-            Column {
-                LargeTopAppBar(
-                    title = {
-                        Column {
-                            Text(
-                                text = "Dein Plan",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = if (courseName.contains("- ")) courseName.substringAfter("- ").substringBefore(" (") else courseName,
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = (-1).sp
-                                )
-                            )
+            // top bar navigation and actions
+            TopAppBar(
+                title = { },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onNavigateToCourseSelection) {
+                        Icon(Icons.Default.Add, contentDescription = "Module hinzufügen")
+                    }
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Einstellungen")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        },
+        bottomBar = {
+            // weekly/daily navigation bar selections
+            NavigationBar(
+                modifier = Modifier
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .clip(RoundedCornerShape(24.dp)),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                tonalElevation = 8.dp
+            ) {
+                val dailyActive = viewMode == TimetableViewMode.DAILY
+                NavigationBarItem(
+                    selected = dailyActive,
+                    onClick = {
+                        if (dailyActive) {
+                            scope.launch { dayPagerState.animateScrollToPage(INITIAL_PAGE) }
+                        } else {
+                            viewMode = TimetableViewMode.DAILY
                         }
                     },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
-                        }
+                    label = { Text("Heute", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.CalendarViewDay,
+                            contentDescription = "Heute"
+                        )
                     },
-                    colors = TopAppBarDefaults.largeTopAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 )
-                
-                TabRow(
-                    selectedTabIndex = viewMode.ordinal,
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    divider = {}
-                ) {
-                    Tab(
-                        selected = viewMode == TimetableViewMode.DAILY,
-                        onClick = { viewMode = TimetableViewMode.DAILY },
-                        text = { Text("Tagesansicht") }
+                val weeklyActive = viewMode == TimetableViewMode.WEEKLY
+                NavigationBarItem(
+                    selected = weeklyActive,
+                    onClick = {
+                        if (weeklyActive) {
+                            scope.launch { weekPagerState.animateScrollToPage(INITIAL_PAGE) }
+                        } else {
+                            viewMode = TimetableViewMode.WEEKLY
+                        }
+                    },
+                    label = { Text("Woche", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.CalendarViewWeek,
+                            contentDescription = "Woche"
+                        )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
-                    Tab(
-                        selected = viewMode == TimetableViewMode.WEEKLY,
-                        onClick = { viewMode = TimetableViewMode.WEEKLY },
-                        text = { Text("Wochenansicht") }
-                    )
-                }
+                )
             }
         },
         modifier = Modifier.fillMaxSize()
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            // Background Gradient
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f),
-                                MaterialTheme.colorScheme.background
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.05f),
+                                Color.Transparent
                             )
                         )
                     )
             )
 
-            if (viewMode == TimetableViewMode.DAILY) {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentPadding = PaddingValues(bottom = 32.dp)
-                ) {
-                    groupedLessons.forEach { (date, dailyLessons) ->
-                        item {
-                            Text(
-                                text = date, // TODO: Format date nicely
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        
-                        itemsIndexed(dailyLessons) { index, lesson ->
-                            var isVisible by remember { mutableStateOf(false) }
-                            LaunchedEffect(Unit) {
-                                isVisible = true
-                            }
-                            
-                            AnimatedVisibility(
-                                visible = isVisible,
-                                enter = fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = index * 50)) +
-                                        slideInVertically(
-                                            animationSpec = tween(durationMillis = 500, delayMillis = index * 50),
-                                            initialOffsetY = { 40 }
-                                        )
-                            ) {
-                                TimetableLessonCard(
-                                    lesson = lesson,
-                                    accentColor = MaterialTheme.colorScheme.primary,
-                                    onClick = { selectedLesson = lesson }
-                                )
-                            }
-                        }
-                    }
-                    
-                    if (lessons.isEmpty()) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillParentMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Keine Vorlesungen für diesen Kurs gefunden.",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                )
-                            }
-                        }
-                    }
-                }
-            } else {
-                Box(modifier = Modifier.padding(innerPadding)) {
-                    TimetableGrid(
-                        lessons = lessons,
-                        onLessonClick = { selectedLesson = it }
+            Column(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize()
+            ) {
+                // dynamic alerts banner displayed if changes are found
+                if (activeWarning != null && activeWarning.first != dismissedWarningMessage) {
+                    LiveUpdateBanner(
+                        message = activeWarning.first,
+                        isCancellation = activeWarning.second,
+                        onDismiss = { dismissedWarningMessage = activeWarning.first }
                     )
                 }
+
+                // horizontal sliding containers switching active pages
+                Box(modifier = Modifier.weight(1f)) {
+                    if (viewMode == TimetableViewMode.DAILY) {
+                        HorizontalPager(
+                            state = dayPagerState,
+                            modifier = Modifier.fillMaxSize()
+                        ) { page ->
+                            val targetDate = today.plusDays((page - INITIAL_PAGE).toLong())
+                            val dayLessons = lessons.filter { it.date == targetDate.toString() }
+
+                            DailyView(
+                                date = targetDate,
+                                lessons = dayLessons,
+                                onLessonClick = { selectedLesson = it }
+                            )
+                        }
+                    } else {
+                        HorizontalPager(
+                            state = weekPagerState,
+                            modifier = Modifier.fillMaxSize()
+                        ) { page ->
+                            val weekOffset = (page - INITIAL_PAGE).toLong()
+                            val weekStart = today.minusDays(today.dayOfWeek.value.toLong() - 1)
+                                .plusWeeks(weekOffset)
+                            val weekEnd = weekStart.plusDays(6)
+
+                            val weekLessons = lessons.filter {
+                                try {
+                                    val lessonDate = LocalDate.parse(it.date)
+                                    !lessonDate.isBefore(weekStart) && !lessonDate.isAfter(weekEnd)
+                                } catch (_: Exception) {
+                                    false
+                                }
+                            }
+
+                            TimetableGrid(
+                                lessons = weekLessons,
+                                currentTime = if (weekOffset == 0L) LocalTime.now() else null,
+                                onLessonClick = { selectedLesson = it }
+                            )
+                        }
+                    }
+                }
             }
-            
-            // Overlay
+
+            // overlay displaying specific lesson event details
             EventDetailOverlay(
                 lesson = selectedLesson?.toLesson(),
+                bottomPadding = innerPadding.calculateBottomPadding(),
                 onDismiss = { selectedLesson = null }
             )
         }

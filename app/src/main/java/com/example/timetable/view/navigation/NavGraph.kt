@@ -9,9 +9,13 @@ import androidx.navigation.navArgument
 import com.example.timetable.view.NavScreen
 import com.example.timetable.view.screens.CourseSelectionScreen
 import com.example.timetable.view.screens.InitialSetupScreen
+import com.example.timetable.view.screens.SettingsScreen
 import com.example.timetable.view.screens.TimetableScreen
 
-// alle möglichen Routen
+/**
+ * Repräsentiert die verschiedenen Navigationsziele (Bildschirme) innerhalb der Anwendung.
+ * Jedes Ziel ist einer eindeutigen Route zugeordnet.
+ */
 sealed class Screen(val route: String) {
     object Home : Screen("home")
     object InitialSetup : Screen("initial_setup")
@@ -19,27 +23,34 @@ sealed class Screen(val route: String) {
         fun createRoute(course: String) = "timetable/$course"
     }
     object CourseSelection : Screen("course_selection")
+    object Settings : Screen("settings")
 }
 
+/**
+ * Der Navigations-Host der App, der die Routen-Definitionen und die Navigation
+ * zwischen den verschiedenen Ansichten (Home, Setup, Stundenplan, Kursauswahl, Einstellungen) verwaltet.
+ */
 @Composable
 fun TimetableNavHost() {
-    // TODO [Logic]: Inject NavigationViewModel here to determine startDestination (Setup vs. Timetable)
+    // TODO [viewmodel]: Inject NavigationViewModel here to determine startDestination (Setup vs. Timetable)
+    // navigation controller manages backstack and screen transitions
     val navController = rememberNavController()
     NavHost(
         navController = navController,
-        startDestination = Screen.Home.route // TODO [Logic]: Use ViewModel state for dynamic startDestination
+        startDestination = Screen.Home.route // TODO [viewmodel]: Use ViewModel state for dynamic startDestination
     ) {
         composable(Screen.Home.route) {
             NavScreen(navController = navController)
         }
         composable(Screen.InitialSetup.route) {
-            // TODO [Logic]: Provide SetupViewModel to InitialSetupScreen
+            // TODO [viewmodel]: Provide SetupViewModel to InitialSetupScreen
+            // setup screen configuration callback
             InitialSetupScreen(
                 onNavigateToTimetable = { course ->
                     navController.navigate(Screen.Timetable.createRoute(course)) {
-                        // doppelte Einträge im Backstack verhindern
+                        // prevent double setup screens on backstack
                         launchSingleTop = true
-                        // initialsetupScreen aus dem Stack entfernen
+                        // drop setup screen from stack after navigating
                         popUpTo(Screen.InitialSetup.route) { inclusive = true }
                     }
                 }
@@ -49,17 +60,31 @@ fun TimetableNavHost() {
             route = Screen.Timetable.route,
             arguments = listOf(navArgument("course") { type = NavType.StringType })
         ) { backStackEntry ->
+            // route definition for main weekly/daily schedule
             val course = backStackEntry.arguments?.getString("course") ?: ""
             TimetableScreen(
                 courseName = course,
-                // zurücknavigieren erlaubt
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToCourseSelection = { navController.navigate(Screen.CourseSelection.route) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
             )
         }
         composable(Screen.CourseSelection.route) {
+            // course selection and search overlay screen
             CourseSelectionScreen(
-                // zurück navigieren erlaubt
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.Settings.route) {
+            // settings navigation routing destination
+            SettingsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSetup = {
+                    // reset backstack to home and navigate to setup when profile changes
+                    navController.navigate(Screen.InitialSetup.route) {
+                        popUpTo(Screen.Home.route) { inclusive = false }
+                    }
+                }
             )
         }
     }

@@ -1,0 +1,117 @@
+{
+  "faculties": [
+    {
+      "code": "eti",
+      "name": "Elektrotechnik und Informationstechnik",
+      "color": "#0000FF"
+    },
+    {
+      "code": "mb",
+      "name": "Maschinenbau",
+      "color": "#008000"
+    },
+    {
+      "code": "ws",
+      "name": "Wirtschaftsingenieurwesen",
+      "color": "#800080"
+    },
+    {
+      "code": "hs",
+      "name": "Hochschulangestellte",
+      "color": "#FF0000"
+    }
+  ],
+  "lessons": [
+    {
+      "id": "lesson_1",
+      "title": "eti-Autonome Mobile Systeme Vorl.",
+      "date": "2026-06-15",
+      "startTime": "10:15",
+      "endTime": "11:45",
+      "room": "4/221 (H4)",
+      "lecturer": "eti-Garske",
+      "course": "eti-Auton. Mob. Syst. Vorl.",
+      "change": null
+    },
+    {
+      "id": "lesson_2",
+      "title": "mb-Kostenrechnung und Kostenanalyse - ÜB",
+      "date": "2026-06-16",
+      "startTime": "09:45",
+      "endTime": "11:15",
+      "room": "4/206 (H4)",
+      "lecturer": "mb-Türr",
+      "course": "mb-SPB_4, eti-WETB 4, mb-WIB_4",
+      "change": {
+        "caption": "Raumänderung",
+        "message": "Findet heute ausnahmsweise in 4/206 statt."
+      }
+    },
+    {
+      "id": "lesson_3",
+      "title": "ws-Statistik I Übung",
+      "date": "2026-06-17",
+      "startTime": "14:00",
+      "endTime": "15:30",
+      "room": "21/202 (H21)",
+      "lecturer": "ws-Honekamp",
+      "course": "ws-Stat I Ü",
+      "change": null
+    },
+    {
+      "id": "lesson_4",
+      "title": "ws-Cloud Computing für Big Data",
+      "date": "2026-06-17",
+      "startTime": "14:00",
+      "endTime": "15:30",
+      "room": "21/PC-L III (316) (H21)",
+      "lecturer": "ws-Richter (LB)",
+      "course": "ws-SoSe DSKI",
+      "change": null
+    },
+    {
+      "id": "lesson_5",
+      "title": "eti-Inf.u.Gesellsch.Vorl.",
+      "date": "2026-06-18",
+      "startTime": "17:30",
+      "endTime": "19:00",
+      "room": "5/HS1 (H5)",
+      "lecturer": "eti-Friedenberg",
+      "course": "eti-SKIB 4",
+      "change": null
+    },
+    {
+      "id": "lesson_6",
+      "title": "eti-PT II Lab",
+      "date": "2026-06-15",
+      "startTime": "10:15",
+      "endTime": "11:45",
+      "room": "4/302 (H4)",
+      "lecturer": "Kein Dozent zugewiesen",
+      "course": "eti-SMSB 2, eti-ETM",
+      "change": null
+    },
+    {
+      "id": "lesson_7",
+      "title": "mb-Mathematik II",
+      "date": "2026-06-15",
+      "startTime": "08:15",
+      "endTime": "09:45",
+      "room": "4/101 (H4)",
+      "lecturer": "mb-Schulz",
+      "course": "mb-BA 2",
+      "change": null
+    },
+    {
+      "id": "lesson_8",
+      "title": "ws-Grundlagen BWL",
+      "date": "2026-06-19",
+      "startTime": "11:45",
+      "endTime": "13:15",
+      "room": "21/HS2 (H21)",
+      "lecturer": "ws-Meier",
+      "course": "ws-BA 1",
+      "change": null
+    }
+  ]
+}

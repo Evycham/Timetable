@@ -3,12 +3,14 @@ package com.example.timetable
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.example.timetable.data.TimetableRepository
-import com.example.timetable.data.local.TimetableDatabase
-import com.example.timetable.data.services.DaVinciApi
+import com.example.timetable.utils.data.RepositorySyncState
+import com.example.timetable.utils.data.TimetableRepository
+import com.example.timetable.utils.data.local.TimetableDatabase
+import com.example.timetable.utils.data.services.DaVinciApi
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,6 +34,7 @@ class TimetableRepositoryTest {
         assertEquals(2, repository.getAllLessons().size)
         assertEquals(1, repository.getAllEvents().size)
         assertEquals(2, repository.getLessonsByGroupsCode("mb-MBB_4").size)
+        assertSame(RepositorySyncState.Ready, repository.syncState.value)
 
         database.close()
     }
@@ -62,7 +65,7 @@ class TimetableRepositoryTest {
     }
 
     @Test
-    fun loadFromCache_readsExistingDatabase_withoutDownloadingAgain() = runBlocking {
+    fun loadFromDatabase_readsExistingDatabase_withoutDownloadingAgain() = runBlocking {
         val database = createDatabase()
         val repository = TimetableRepository(
             context = applicationContext(),
@@ -73,7 +76,7 @@ class TimetableRepositoryTest {
         repository.reloadJson()
         repository.clearMemory()
 
-        val calenderDays = repository.loadFromCache()
+        val calenderDays = repository.loadFromDatabase()
 
         assertEquals(3, calenderDays?.size)
         assertEquals(2, repository.getAllLessons().size)
@@ -112,6 +115,49 @@ class TimetableRepositoryTest {
         assertEquals(2, updateRepository.getAllEvents().size)
 
         database.close()
+    }
+
+    @Test
+    fun updateJsonIfNeeded_returnsFalseAndKeepsLocalData_whenOfflineAndDatabaseHasData() = runBlocking {
+        val database = createDatabase()
+        TimetableRepository(
+            context = applicationContext(),
+            api = DaVinciApi(downloader = { firstJson() }),
+            database = database
+        ).initialize()
+
+        val repository = TimetableRepository(
+            context = applicationContext(),
+            api = DaVinciApi(downloader = { throw IllegalStateException("offline") }),
+            database = database
+        )
+
+        val updated = repository.updateJsonIfNeeded()
+
+        assertFalse(updated)
+        assertEquals(2, repository.getAllLessons().size)
+        assertTrue(repository.syncState.value is RepositorySyncState.Ready)
+
+        database.close()
+    }
+
+    @Test
+    fun updateJsonIfNeeded_throws_whenOfflineAndDatabaseIsEmpty() = runBlocking {
+        val database = createDatabase()
+        val repository = TimetableRepository(
+            context = applicationContext(),
+            api = DaVinciApi(downloader = { throw IllegalStateException("offline") }),
+            database = database
+        )
+
+        try {
+            repository.updateJsonIfNeeded()
+            throw AssertionError("Expected IllegalStateException")
+        } catch (expected: IllegalStateException) {
+            assertTrue(repository.syncState.value is RepositorySyncState.Error)
+        } finally {
+            database.close()
+        }
     }
 
     private fun createDatabase(): TimetableDatabase =

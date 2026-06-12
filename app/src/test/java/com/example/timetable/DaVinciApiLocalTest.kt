@@ -1,6 +1,7 @@
 package com.example.timetable
 
-import com.example.timetable.data.services.DaVinciApi
+import com.example.timetable.utils.data.services.DaVinciApi
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -9,7 +10,7 @@ import org.junit.Test
 class DaVinciApiLocalTest {
 
     @Test
-    fun downloadSnapshot_returnsParsedResponseWithHashAndSize() {
+    fun downloadSnapshot_returnsParsedResponseWithHashAndSize() = runBlocking {
         val json = sampleJson(lessonCount = 2, eventCount = 1)
         val api = DaVinciApi(downloader = { json })
 
@@ -23,7 +24,7 @@ class DaVinciApiLocalTest {
     }
 
     @Test
-    fun downloadSnapshot_returnsStableHash_forSameJson() {
+    fun downloadSnapshot_returnsStableHash_forSameJson() = runBlocking {
         val json = sampleJson(lessonCount = 1, eventCount = 1)
 
         val first = DaVinciApi(downloader = { json }).downloadSnapshot()
@@ -34,7 +35,7 @@ class DaVinciApiLocalTest {
     }
 
     @Test
-    fun downloadSnapshot_returnsDifferentHash_forChangedJson() {
+    fun downloadSnapshot_returnsDifferentHash_forChangedJson() = runBlocking {
         val firstJson = sampleJson(lessonCount = 1, eventCount = 1)
         val secondJson = sampleJson(lessonCount = 3, eventCount = 2)
 

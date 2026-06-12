@@ -1,8 +1,8 @@
 package com.example.timetable
 
-import com.example.timetable.data.services.CalenderDayMapper
-import com.example.timetable.data.datenmodell.Event
-import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.utils.data.services.CalenderDayMapper
+import com.example.timetable.utils.data.datenmodell.Event
+import com.example.timetable.utils.data.datenmodell.Lesson
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

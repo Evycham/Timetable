@@ -1,10 +1,11 @@
 package com.example.timetable
 
-import com.example.timetable.data.datenmodell.Lesson
-import com.example.timetable.data.services.LessonParser
+import com.example.timetable.utils.data.datenmodell.Lesson
+import com.example.timetable.utils.data.services.LessonParser
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -87,6 +88,58 @@ class LessonParserTest {
     }
 
     @Test
+    fun parseLesson_changesId_whenRoomChanges() {
+        val baseLesson = JSONObject(
+            """
+            {
+              "courseTitle": "Mathe",
+              "dates": ["20260518"],
+              "startTime": "0945",
+              "endTime": "1115",
+              "classCodes": ["mb-MBB_4"],
+              "teacherCodes": ["dozent-1"],
+              "roomCodes": ["4/302"],
+              "buildingCodes": ["H4"]
+            }
+            """.trimIndent()
+        )
+        val changedRoom = JSONObject(baseLesson.toString()).apply {
+            put("roomCodes", JSONArray("[\"4/999\"]"))
+        }
+
+        val firstId = parser.parseLesson(baseLesson).first().id
+        val secondId = parser.parseLesson(changedRoom).first().id
+
+        assertNotEquals(firstId, secondId)
+    }
+
+    @Test
+    fun parseLesson_changesId_whenTeacherChanges() {
+        val baseLesson = JSONObject(
+            """
+            {
+              "courseTitle": "Mathe",
+              "dates": ["20260518"],
+              "startTime": "0945",
+              "endTime": "1115",
+              "classCodes": ["mb-MBB_4"],
+              "teacherCodes": ["dozent-1"],
+              "roomCodes": ["4/302"],
+              "buildingCodes": ["H4"]
+            }
+            """.trimIndent()
+        )
+        val changedTeacher = JSONObject(baseLesson.toString()).apply {
+            put("teacherCodes", JSONArray("[\"dozent-2\"]"))
+        }
+
+        val firstId = parser.parseLesson(baseLesson).first().id
+        val secondId = parser.parseLesson(changedTeacher).first().id
+
+        assertNotEquals(firstId, secondId)
+    }
+
+    @Test
     fun parseLesson_returnsEmptySet_whenRequiredFieldsAreMissing() {
         val lessonWithoutTitle = JSONObject(
             """
@@ -108,6 +161,24 @@ class LessonParserTest {
 
         assertTrue(parser.parseLesson(lessonWithoutTitle).isEmpty())
         assertTrue(parser.parseLesson(lessonWithoutDates).isEmpty())
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun parseLesson_failsFast_whenRoomCodesIsNotAnArray() {
+        val lessonJson = JSONObject(
+            """
+            {
+              "courseTitle": "Defekt",
+              "dates": ["20260518"],
+              "startTime": "0945",
+              "endTime": "1115",
+              "classCodes": ["mb-MBB_4"],
+              "roomCodes": "4/302"
+            }
+            """.trimIndent()
+        )
+
+        parser.parseLesson(lessonJson)
     }
 
     @Test

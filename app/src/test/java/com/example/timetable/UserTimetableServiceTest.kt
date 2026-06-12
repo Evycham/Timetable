@@ -4,11 +4,11 @@ import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.example.timetable.data.TimetableRepository
-import com.example.timetable.data.UserSchedulePreferencesStore
-import com.example.timetable.data.local.TimetableDatabase
-import com.example.timetable.data.services.DaVinciApi
-import com.example.timetable.data.services.UserTimetableService
+import com.example.timetable.utils.data.TimetableRepository
+import com.example.timetable.utils.data.UserSchedulePreferencesStore
+import com.example.timetable.utils.data.local.TimetableDatabase
+import com.example.timetable.utils.data.services.DaVinciApi
+import com.example.timetable.utils.data.services.UserTimetableService
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -51,6 +51,31 @@ class UserTimetableServiceTest {
         assertEquals(listOf("Mathe", "Informatik"), userLessons.map { it.title })
         assertEquals(listOf("2026-05-19", "2026-05-20"), userDays.map { it.date })
         assertTrue(userDays.any { day -> day.events.isNotEmpty() })
+
+        database.close()
+    }
+
+    @Test
+    fun buildUserLessons_prefersHiddenRule_whenLessonIsExtraAndHidden() = runBlocking {
+        val tempDir = Files.createTempDirectory("user-timetable-service-conflict-test").toFile()
+        val database = createDatabase()
+        val repository = TimetableRepository(
+            context = applicationContext(),
+            api = DaVinciApi(downloader = { sampleJson() }),
+            database = database
+        )
+        repository.initialize()
+
+        val preferencesStore = createPreferencesStore(tempDir)
+        val userService = UserTimetableService(repository, preferencesStore)
+        val informatikLesson = repository.getLessonsByTitleAndGroupsCode("Informatik", "eti-SKIB_4").first()
+
+        userService.addExtraLessonById(informatikLesson.id)
+        userService.hideLessonById(informatikLesson.id)
+
+        val userLessons = userService.buildUserLessons()
+
+        assertTrue(userLessons.isEmpty())
 
         database.close()
     }

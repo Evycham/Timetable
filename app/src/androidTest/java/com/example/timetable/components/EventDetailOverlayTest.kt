@@ -5,7 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.utils.data.datenmodell.Lesson
 import com.example.timetable.view.components.timetable.EventDetailOverlay
 import com.example.timetable.view.theme.TimeTableTheme
 import org.junit.Assert.assertTrue
@@ -33,7 +33,7 @@ class EventDetailOverlayTest {
 
     @Test
     fun eventDetailOverlay_whenLessonIsNotNull_showsDetails() {
-        val testLesson = Lesson(
+        val testLesson = _root_ide_package_.com.example.timetable.utils.data.datenmodell.Lesson(
             id = "lesson-123",
             title = "Algorithmen & Datenstrukturen",
             date = "2026-06-15",
@@ -43,7 +43,7 @@ class EventDetailOverlayTest {
             building = "H4",
             teacher = setOf("Prof. Dr. Schmidt"),
             groupsCode = setOf("eti-INF_2"),
-            change = Lesson.Change(
+            change = _root_ide_package_.com.example.timetable.utils.data.datenmodell.Lesson.Change(
                 caption = "Raumänderung",
                 reasonType = "roomChange",
                 modified = "2026-06-10"

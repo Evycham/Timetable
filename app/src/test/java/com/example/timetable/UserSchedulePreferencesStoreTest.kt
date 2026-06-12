@@ -1,10 +1,12 @@
 package com.example.timetable
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import com.example.timetable.data.UserSchedulePreferencesStore
-import com.example.timetable.data.datenmodell.HiddenLessonRule
-import com.example.timetable.data.datenmodell.LessonSelection
-import com.example.timetable.data.datenmodell.UserSchedulePreferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.example.timetable.utils.data.UserSchedulePreferencesStore
+import com.example.timetable.utils.data.datenmodell.HiddenLessonRule
+import com.example.timetable.utils.data.datenmodell.LessonSelection
+import com.example.timetable.utils.data.datenmodell.UserSchedulePreferences
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -17,11 +19,10 @@ class UserSchedulePreferencesStoreTest {
     @Test
     fun preferencesFlow_emitsStoredSetupState_andSelections() = runBlocking {
         val tempDir = Files.createTempDirectory("preferences-store-test").toFile()
-        val store = UserSchedulePreferencesStore(
-            PreferenceDataStoreFactory.create(
-                produceFile = { tempDir.resolve("user-preferences.preferences_pb") }
-            )
+        val dataStore = PreferenceDataStoreFactory.create(
+            produceFile = { tempDir.resolve("user-preferences.preferences_pb") }
         )
+        val store = UserSchedulePreferencesStore(dataStore)
 
         store.save(
             UserSchedulePreferences(
@@ -38,5 +39,24 @@ class UserSchedulePreferencesStoreTest {
         assertEquals("mb-MBB_4", preferences.groupsCode)
         assertEquals(setOf(LessonSelection(lessonId = "lesson-1")), preferences.extraLessons)
         assertEquals(setOf(HiddenLessonRule(title = "Mathe")), preferences.hiddenLessons)
+    }
+
+    @Test
+    fun preferencesFlow_returnsEmptyRules_whenStoredJsonIsCorrupted() = runBlocking {
+        val tempDir = Files.createTempDirectory("preferences-store-corruption-test").toFile()
+        val dataStore = PreferenceDataStoreFactory.create(
+            produceFile = { tempDir.resolve("user-preferences.preferences_pb") }
+        )
+        val store = UserSchedulePreferencesStore(dataStore)
+
+        dataStore.edit { preferences ->
+            preferences[stringPreferencesKey("extra_lessons_json")] = "{broken"
+            preferences[stringPreferencesKey("hidden_lessons_json")] = "[broken"
+        }
+
+        val preferences = store.preferencesFlow.first()
+
+        assertTrue(preferences.extraLessons.isEmpty())
+        assertTrue(preferences.hiddenLessons.isEmpty())
     }
 }

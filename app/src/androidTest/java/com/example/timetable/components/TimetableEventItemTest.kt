@@ -3,7 +3,7 @@ package com.example.timetable.components
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import com.example.timetable.data.datenmodell.Event
+import com.example.timetable.utils.data.datenmodell.Event
 import com.example.timetable.view.components.timetable.TimeTableEventItem
 import com.example.timetable.view.theme.TimeTableTheme
 import org.junit.Rule
@@ -16,7 +16,7 @@ class TimetableEventItemTest {
 
     @Test
     fun timetableEventItem_displaysTitleAndCategory() {
-        val testEvent = Event(
+        val testEvent = _root_ide_package_.com.example.timetable.utils.data.datenmodell.Event(
             id = "test-event-1",
             title = "Weihnachtsferien",
             startDate = "2026-12-21",

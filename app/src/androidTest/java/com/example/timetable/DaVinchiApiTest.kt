@@ -1,15 +1,15 @@
 package com.example.timetable
 
 import com.example.timetable.utils.data.services.DaVinciApi
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Test
-
 
 class DaVinciApiTest {
 
     @Test
-    fun download_returnsLessonsAndEventTimes(){
-        val api = _root_ide_package_.com.example.timetable.utils.data.services.DaVinciApi()
+    fun download_returnsLessonsAndEventTimes() = runBlocking {
+        val api = DaVinciApi()
 
         val response = api.download()
 

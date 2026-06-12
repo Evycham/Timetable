@@ -1,4 +1,4 @@
-package com.example.timetable.data.local
+package com.example.timetable.utils.data.local
 
 import android.content.Context
 import androidx.room.Database
@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 
 @Database(
     entities = [LessonEntity::class, EventEntity::class, SyncMetadataEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
@@ -32,7 +32,8 @@ abstract class TimetableDatabase : RoomDatabase() {
                     context.applicationContext,
                     TimetableDatabase::class.java,
                     DATABASE_NAME
-                ).build().also { database ->
+                ).fallbackToDestructiveMigration(dropAllTables = true)
+                    .build().also { database ->
                     instance = database
                 }
             }

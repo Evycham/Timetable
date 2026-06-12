@@ -35,6 +35,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,11 +51,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.timetable.utils.enums.Faculty
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.timetable.view.components.common.SelectionChip
-import com.example.timetable.view.json.JsonLessonRepository
 import com.example.timetable.view.json.MockLogic
+import com.example.timetable.viewmodel.SetupViewModel
 
 /**
  * Der Onboarding-Bildschirm für die Ersteinrichtung der App.
@@ -64,15 +66,19 @@ import com.example.timetable.view.json.MockLogic
  */
 @Composable
 fun InitialSetupScreen(
-    onNavigateToTimetable: (String) -> Unit
+    onNavigateToTimetable: (String) -> Unit,
+    setupViewModel: SetupViewModel = viewModel(
+        factory = SetupViewModel.factory(LocalContext.current)
+    )
 ) {
-    val context = LocalContext.current
-    val repository = remember { JsonLessonRepository(context) }
+    val uiState by setupViewModel.uiState.collectAsState()
 
-    // state management for the multi-step selection process
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedFaculty by remember { mutableStateOf<Faculty?>(null) }
     var selectedCourse by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(uiState.selectedFaculty) {
+        selectedCourse = null
+        MockLogic.activeFacultyColor = uiState.selectedFaculty?.color
+    }
 
     Box(
         modifier = Modifier.fillMaxSize()
@@ -109,7 +115,7 @@ fun InitialSetupScreen(
 
             // dynamic content switching based on selection stage
             AnimatedContent(
-                targetState = selectedFaculty,
+                targetState = uiState.selectedFaculty,
                 label = "SetupStateTransition",
                 transitionSpec = {
                     slideInHorizontally(
@@ -144,15 +150,14 @@ fun InitialSetupScreen(
                                 .verticalScroll(rememberScrollState()),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Faculty.entries.forEach { f ->
+                            uiState.faculties.forEach { f ->
                                 SelectionChip(
                                     label = f.label,
                                     color = f.color,
                                     isSelected = false,
                                     testTagPrefix = "selectedFacultyChip",
                                     onClick = {
-                                        selectedFaculty = f
-                                        MockLogic.activeFacultyColor = f.color
+                                        setupViewModel.selectFaculty(f)
                                     }
                                 )
                             }
@@ -176,10 +181,7 @@ fun InitialSetupScreen(
                             ) {
                                 IconButton(
                                     onClick = {
-                                        selectedFaculty = null
-                                        selectedCourse = null
-                                        searchQuery = ""
-                                        MockLogic.activeFacultyColor = null
+                                        setupViewModel.clearFacultySelection()
                                     },
                                     modifier = Modifier.offset(x = (-12).dp)
                                 ) {
@@ -205,8 +207,8 @@ fun InitialSetupScreen(
                                     .verticalScroll(rememberScrollState())
                             ) {
                                 OutlinedTextField(
-                                    value = searchQuery,
-                                    onValueChange = { searchQuery = it },
+                                    value = uiState.searchQuery,
+                                    onValueChange = { setupViewModel.updateSearchQuery(it) },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .testTag("courseSearchField"),
@@ -246,18 +248,10 @@ fun InitialSetupScreen(
                                     modifier = Modifier.padding(start = 8.dp, bottom = 12.dp)
                                 )
 
-                                // filter courses based on chosen faculty and search query
-                                val courses = remember(selectedFaculty, searchQuery) {
-                                    selectedFaculty?.let { faculty ->
-                                        repository.getCoursesByFaculty(faculty.prefix)
-                                            .filter { it.contains(searchQuery, ignoreCase = true) }
-                                    } ?: emptyList()
-                                }
-
                                 Column(
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    courses.forEach { course ->
+                                    uiState.filteredCourses.forEach { course ->
                                         SelectionChip(
                                             label = course,
                                             color = faculty.color,
@@ -298,13 +292,15 @@ fun InitialSetupScreen(
 
                             Button(
                                 onClick = {
-                                    selectedCourse?.let {
+                                    selectedCourse?.let { course ->
                                         // initial population of the plan with the whole course schedule
                                         MockLogic.selectedModuleTitles.clear()
-                                        repository.getLessonsByCourse(it).forEach { lesson ->
+                                        setupViewModel.getLessonsForCourse(course).forEach { lesson ->
                                             MockLogic.addModule(lesson.title)
                                         }
-                                        onNavigateToTimetable(it)
+                                        setupViewModel.completeSetup(course) {
+                                            onNavigateToTimetable(course)
+                                        }
                                     }
                                 },
                                 modifier = Modifier

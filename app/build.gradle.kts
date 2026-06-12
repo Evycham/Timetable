@@ -60,6 +60,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.text.google.fonts)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.datastore.preferences)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4.android)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     // --- UI END ---

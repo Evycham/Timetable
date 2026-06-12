@@ -1,6 +1,8 @@
 package com.example.timetable.view.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -11,6 +13,7 @@ import com.example.timetable.view.screens.CourseSelectionScreen
 import com.example.timetable.view.screens.InitialSetupScreen
 import com.example.timetable.view.screens.SettingsScreen
 import com.example.timetable.view.screens.TimetableScreen
+import com.example.timetable.viewmodel.SetupViewModel
 
 /**
  * Repräsentiert die verschiedenen Navigationsziele (Bildschirme) innerhalb der Anwendung.
@@ -43,9 +46,13 @@ fun TimetableNavHost() {
             NavScreen(navController = navController)
         }
         composable(Screen.InitialSetup.route) {
-            // TODO [viewmodel]: Provide SetupViewModel to InitialSetupScreen
+            val context = LocalContext.current
+            val setupViewModel: SetupViewModel = viewModel(
+                factory = SetupViewModel.factory(context)
+            )
             // setup screen configuration callback
             InitialSetupScreen(
+                setupViewModel = setupViewModel,
                 onNavigateToTimetable = { course ->
                     navController.navigate(Screen.Timetable.createRoute(course)) {
                         // prevent double setup screens on backstack

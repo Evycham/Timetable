@@ -1,4 +1,4 @@
-package com.example.timetable.data
+package com.example.timetable.utils.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
@@ -8,14 +8,15 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.example.timetable.data.datenmodell.HiddenLessonRule
-import com.example.timetable.data.datenmodell.LessonSelection
-import com.example.timetable.data.datenmodell.UserSchedulePreferences
+import com.example.timetable.utils.data.datenmodell.HiddenLessonRule
+import com.example.timetable.utils.data.datenmodell.LessonSelection
+import com.example.timetable.utils.data.datenmodell.UserSchedulePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
 
@@ -112,23 +113,28 @@ class UserSchedulePreferencesStore(
     private fun decodeExtraLessons(raw: String): Set<LessonSelection> {
         if (raw.isBlank()) return emptySet()
 
-        val array = JSONArray(raw)
-        return buildSet {
-            for (i in 0 until array.length()) {
-                val item = array.optJSONObject(i) ?: continue
-                val lessonId = item.optString("lessonId").trim().ifEmpty { null }
-                val groupsCode = item.optString("groupsCode").trim().ifEmpty { null }
-                val title = item.optString("title").trim().ifEmpty { null }
-                if (lessonId != null || (groupsCode != null && title != null)) {
-                    add(
-                        LessonSelection(
-                            lessonId = lessonId,
-                            groupsCode = groupsCode,
-                            title = title
+        return try {
+            val array = JSONArray(raw)
+            buildSet {
+                for (i in 0 until array.length()) {
+                    val item = array.optJSONObject(i) ?: continue
+                    val lessonId = item.optString("lessonId").trim().ifEmpty { null }
+                    val groupsCode = item.optString("groupsCode").trim().ifEmpty { null }
+                    val title = item.optString("title").trim().ifEmpty { null }
+                    if (lessonId != null || (groupsCode != null && title != null)) {
+                        add(
+                            LessonSelection(
+                                lessonId = lessonId,
+                                groupsCode = groupsCode,
+                                title = title
+                            )
                         )
-                    )
+                    }
                 }
             }
+        } catch (exception: JSONException) {
+            System.err.println("UserSchedulePreferencesStore error decoding extraLessons: ${exception.message}")
+            emptySet()
         }
     }
 
@@ -148,23 +154,28 @@ class UserSchedulePreferencesStore(
     private fun decodeHiddenLessons(raw: String): Set<HiddenLessonRule> {
         if (raw.isBlank()) return emptySet()
 
-        val array = JSONArray(raw)
-        return buildSet {
-            for (i in 0 until array.length()) {
-                val item = array.optJSONObject(i) ?: continue
-                val lessonId = item.optString("lessonId").trim().ifEmpty { null }
-                val title = item.optString("title").trim().ifEmpty { null }
-                val groupsCode = item.optString("groupsCode").trim().ifEmpty { null }
-                if (lessonId != null || title != null) {
-                    add(
-                        HiddenLessonRule(
-                            lessonId = lessonId,
-                            title = title,
-                            groupsCode = groupsCode
+        return try {
+            val array = JSONArray(raw)
+            buildSet {
+                for (i in 0 until array.length()) {
+                    val item = array.optJSONObject(i) ?: continue
+                    val lessonId = item.optString("lessonId").trim().ifEmpty { null }
+                    val title = item.optString("title").trim().ifEmpty { null }
+                    val groupsCode = item.optString("groupsCode").trim().ifEmpty { null }
+                    if (lessonId != null || title != null) {
+                        add(
+                            HiddenLessonRule(
+                                lessonId = lessonId,
+                                title = title,
+                                groupsCode = groupsCode
+                            )
                         )
-                    )
+                    }
                 }
             }
+        } catch (exception: JSONException) {
+            System.err.println("UserSchedulePreferencesStore error decoding hiddenLessons: ${exception.message}")
+            emptySet()
         }
     }
 

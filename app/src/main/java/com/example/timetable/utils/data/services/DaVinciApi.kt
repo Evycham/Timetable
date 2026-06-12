@@ -1,6 +1,8 @@
-package com.example.timetable.data.services
+package com.example.timetable.utils.data.services
 
-import com.example.timetable.data.datenmodell.DaVinciResponse
+import com.example.timetable.utils.data.datenmodell.DaVinciResponse
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
 import java.security.MessageDigest
@@ -22,7 +24,7 @@ class DaVinciApi(
      *
      * @return Die geparste API-Antwort.
      */
-    fun download(): DaVinciResponse =
+    suspend fun download(): DaVinciResponse =
         downloadSnapshot().response
 
     /**
@@ -30,15 +32,16 @@ class DaVinciApi(
      *
      * @return Snapshot mit Raw-JSON, geparster Antwort und Vergleichsmetadaten.
      */
-    fun downloadSnapshot(): DaVinciDownloadSnapshot {
-        val jsonString = fetchJson()
-        return DaVinciDownloadSnapshot(
-            rawJson = jsonString,
-            response = parseResponse(jsonString),
-            jsonSize = jsonString.toByteArray(Charsets.UTF_8).size.toLong(),
-            jsonHash = sha256(jsonString)
-        )
-    }
+    suspend fun downloadSnapshot(): DaVinciDownloadSnapshot =
+        withContext(Dispatchers.IO) {
+            val jsonString = fetchJson()
+            DaVinciDownloadSnapshot(
+                rawJson = jsonString,
+                response = parseResponse(jsonString),
+                jsonSize = jsonString.toByteArray(Charsets.UTF_8).size.toLong(),
+                jsonHash = sha256(jsonString)
+            )
+        }
 
     private fun fetchJson(): String =
         downloader?.invoke() ?: URL(url).readText()

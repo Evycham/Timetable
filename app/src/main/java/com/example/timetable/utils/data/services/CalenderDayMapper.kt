@@ -1,8 +1,8 @@
-package com.example.timetable.data.services
+package com.example.timetable.utils.data.services
 
-import com.example.timetable.data.datenmodell.CalenderDay
-import com.example.timetable.data.datenmodell.Event
-import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.utils.data.datenmodell.CalenderDay
+import com.example.timetable.utils.data.datenmodell.Event
+import com.example.timetable.utils.data.datenmodell.Lesson
 import java.time.LocalDate
 
 object CalenderDayMapper {

@@ -1,15 +1,14 @@
-package com.example.timetable.data.services
+package com.example.timetable.utils.data.services
 
-import com.example.timetable.data.TimetableRepository
-import com.example.timetable.data.UserSchedulePreferencesStore
-import com.example.timetable.data.datenmodell.CalenderDay
-import com.example.timetable.data.datenmodell.HiddenLessonRule
-import com.example.timetable.data.datenmodell.Lesson
-import com.example.timetable.data.datenmodell.LessonSelection
-import com.example.timetable.data.datenmodell.UserSchedulePreferences
+import com.example.timetable.utils.data.TimetableRepository
+import com.example.timetable.utils.data.UserSchedulePreferencesStore
+import com.example.timetable.utils.data.datenmodell.CalenderDay
+import com.example.timetable.utils.data.datenmodell.HiddenLessonRule
+import com.example.timetable.utils.data.datenmodell.Lesson
+import com.example.timetable.utils.data.datenmodell.LessonSelection
+import com.example.timetable.utils.data.datenmodell.UserSchedulePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 
 class UserTimetableService(
     private val repository: TimetableRepository,

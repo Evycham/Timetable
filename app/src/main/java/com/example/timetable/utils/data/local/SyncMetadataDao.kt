@@ -1,4 +1,4 @@
-package com.example.timetable.data.local
+package com.example.timetable.utils.data.local
 
 import androidx.room.Dao
 import androidx.room.Insert

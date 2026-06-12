@@ -1,7 +1,7 @@
-package com.example.timetable.data.local
+package com.example.timetable.utils.data.local
 
-import com.example.timetable.data.datenmodell.Event
-import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.utils.data.datenmodell.Event
+import com.example.timetable.utils.data.datenmodell.Lesson
 
 fun Lesson.toEntity(): LessonEntity = LessonEntity(
     id = id,

@@ -63,4 +63,17 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4.android)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     // --- UI END ---
+
+    // Room Database
+    implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
+
+    // DataStore Preferences
+    implementation(libs.androidx.datastore.preferences)
+
+    // Unit Test Helpers
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.robolectric)
 }
+

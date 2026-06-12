@@ -37,6 +37,9 @@ class TimetableScreenUiTest {
             }
         }
 
+        // Switch to Daily View to see the Lesson Cards (since title text is commented out in week view grid)
+        composeTestRule.onNodeWithText("Heute").performClick()
+
         // Check if navigation icon is displayed instead of the title which was removed
         composeTestRule.onNodeWithContentDescription("Zurück").assertIsDisplayed()
         
@@ -56,6 +59,9 @@ class TimetableScreenUiTest {
                 TimetableScreen(courseName = testCourse)
             }
         }
+
+        // Switch to Daily View to see the Lesson Cards
+        composeTestRule.onNodeWithText("Heute").performClick()
 
         // Click on the lesson card (using substring without prefix)
         composeTestRule.onNodeWithText("Autonome Mobile Systeme Vorl.", substring = true).performClick()

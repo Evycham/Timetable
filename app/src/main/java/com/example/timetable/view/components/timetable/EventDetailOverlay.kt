@@ -282,13 +282,13 @@ fun EventDetailOverlay(
             onDismissRequest = { showDeleteConfirmation = false },
             title = {
                 Text(
-                    text = "Modul entfernen?",
+                    text = "Kurs entfernen?",
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Text(
-                    text = "Möchtest du das Modul \"${lesson.title.substringAfter("-")}\" wirklich aus deinem Stundenplan löschen?"
+                    text = "Möchtest du den Kurs \"${lesson.title.substringAfter("-")}\" wirklich aus deinem Stundenplan löschen?"
                 )
             },
             confirmButton = {

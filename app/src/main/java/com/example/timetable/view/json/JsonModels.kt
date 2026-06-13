@@ -1,6 +1,6 @@
 package com.example.timetable.view.json
 
-import com.example.timetable.utils.data.datenmodell.Lesson
+import com.example.timetable.data.model.Lesson
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.DayOfWeek

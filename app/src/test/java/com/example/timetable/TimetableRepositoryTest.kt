@@ -3,10 +3,10 @@ package com.example.timetable
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.example.timetable.utils.data.RepositorySyncState
-import com.example.timetable.utils.data.TimetableRepository
-import com.example.timetable.utils.data.local.TimetableDatabase
-import com.example.timetable.utils.data.services.DaVinciApi
+import com.example.timetable.data.repository.RepositorySyncState
+import com.example.timetable.data.repository.TimetableRepository
+import com.example.timetable.data.local.db.TimetableDatabase
+import com.example.timetable.data.remote.DaVinciApi
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

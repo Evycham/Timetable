@@ -1,44 +1,99 @@
 # Timetable Data Guide
 
+## Inhaltsverzeichnis
+
+- [Ziel dieses Dokuments](#ziel-dieses-dokuments)
+- [Architektur auf einen Blick](#architektur-auf-einen-blick)
+- [Wichtige Grundidee](#wichtige-grundidee)
+    - [1. Globale Stundenplandaten](#1-globale-stundenplandaten)
+    - [2. User-spezifische Auswahl](#2-user-spezifische-auswahl)
+- [Datenmodelle](#datenmodelle)
+    - [`Lesson`](#lesson)
+    - [`Event`](#event)
+    - [`groupsCode`](#groupscode)
+    - [`CalenderDay`](#calenderday)
+    - [`extraLessons`](#extralessons)
+    - [`hiddenLessons`](#hiddenlessons)
+    - [`UserSchedulePreferences`](#userschedulepreferences)
+- [Zuständigkeiten der Klassen](#zuständigkeiten-der-klassen)
+    - [`DaVinciApi`](#davinciapi)
+    - [`LessonParser`](#lessonparser)
+    - [`CalenderDayMapper`](#calenderdaymapper)
+    - [`TimetableRepository`](#timetablerepository)
+    - [`UserSchedulePreferencesStore`](#userschedulepreferencesstore)
+    - [`UserTimetableService`](#usertimetableservice)
+    - [`TimetableAlertDetector`](#timetablealertdetector)
+- [Reihenfolge und Atomarität der User-Regeln](#reihenfolge-und-atomarität-der-user-regeln)
+- [Datenfluss im Detail](#datenfluss-im-detail)
+    - [Erstes Laden der App](#erstes-laden-der-app)
+    - [Erstes Laden der App ohne Internet](#erstes-laden-der-app-ohne-internet)
+    - [Späterer App-Start ohne Internet](#späterer-app-start-ohne-internet)
+    - [Update-Prüfung](#update-prüfung)
+    - [Persönlicher Stundenplan eines Users](#persönlicher-stundenplan-eines-users)
+- [Was die UI später wirklich benutzen sollte](#was-die-ui-später-wirklich-benutzen-sollte)
+- [Empfohlener UI-Startablauf](#empfohlener-ui-startablauf)
+- [Welche Methode wann benutzt werden sollte](#welche-methode-wann-benutzt-werden-sollte)
+- [Typische Anwendungsfälle](#typische-anwendungsfälle)
+- [Fehler- und Offlineverhalten](#fehler-und-offlineverhalten)
+- [Wichtige technische Hinweise](#wichtige-technische-hinweise)
+- [Bewusst nicht umgesetzt](#bewusst-nicht-umgesetzt)
+- [Sinnvolle nächste Schritte](#sinnvolle-nächste-schritte)
+- [Kurzfassung](#kurzfassung)
+- [Guidelines für die ViewModel-Implementierung](#guidelines-für-die-viewmodel-implementierung)
+- [Hinweise an den Data-Entwickler: Was wurde warum geändert?](#hinweise-an-den-data-entwickler-was-wurde-warum-geändert)
+
+---
+
 ## Ziel dieses Dokuments
 
-Dieses Dokument beschreibt die aktuelle Datenarchitektur der App.
-Es ist für Entwickler gedacht, die später UI, ViewModel, Worker oder weitere Features mit dem
-Datenlayer verbinden.
+Dieses Dokument beschreibt die relationale, MVVM-konforme Datenarchitektur der App. Es ist für
+Entwickler gedacht, die später UI, ViewModel, Worker oder weitere Features mit dem Datenlayer
+verbinden.
 
 Der Fokus liegt auf diesen Fragen:
 
 - Woher kommen die Stundenplandaten?
-- Wo werden sie gespeichert?
+- Wo werden sie gespeichert und wie ist das Datenbankschema relational normalisiert?
 - Welche Klasse ist für was zuständig?
 - Welche Methoden und Flows sollen von UI oder ViewModel benutzt werden?
 - Wie wird aus globalen Daten der persönliche Stundenplan eines Users gebaut?
-- Welche aktuellen Grenzen oder Risiken gibt es im Modell?
+- Welche Richtlinien müssen bei der Implementierung von ViewModels beachtet werden?
+
+---
 
 ## Architektur auf einen Blick
 
-Der aktuelle Datenfluss ist bewusst getrennt:
+Der Datenfluss ist schichtenbasiert aufgebaut:
 
-1. `DaVinciApi`
-   Lädt die aktuelle JSON vom Server.
+1. **DaVinciApi.kt**: Lädt die aktuelle JSON-Stundenplandatei über HTTP vom Server.
+2. **LessonParser.kt**: Parst die JSON-Rohdaten in Domänen-Modelle wie `Lesson` und `Event` und
+   generiert stabile IDs über `lessonRef#date`.
+3. **TimetableRepository.kt**: Zentrale Datenquelle (Single Source of Truth) für alle globalen
+   Stundenplandaten. Speichert Snapshots transaktional in Room ab und stellt reaktive Daten-Flows
+   bereit.
+4. **UserSchedulePreferencesStore.kt**: Speichert einfache Benutzereinstellungen (wie die gewählte
+   Studiengruppe) im Preferences DataStore.
+5. **UserTimetableService.kt**: Verwaltet die Custom-Regeln und stellt den reaktiven persönlichen
+   Stundenplan bereit. Die Filterung läuft hochperformant direkt in SQLite über
+   Room-Datenbankabfragen.
+6. **CalenderDayMapper.kt**: Führt gefilterte `Lesson`- und `Event`-Modelle zu einer tagesweisen
+   Darstellung (`List<CalenderDay>`) zusammen.
 
-2. `LessonParser`
-   Parsed die JSON in App-Modelle wie `Lesson` und `Event`.
+### Datenfluss im Überblick
 
-3. `TimetableRepository`
-   Ist die zentrale Datenquelle für alle globalen Stundenplandaten.
-   Diese Klasse lädt aus Room, aktualisiert bei Bedarf aus dem Netz und stellt Listen, Flows und
-   Sync-Status bereit.
+```mermaid
+graph TD
+    API["DaVinci API JSON"] -->|fetch| Client["DaVinciApi"]
+    Client -->|Raw JSON| Parser["LessonParser"]
+    Parser -->|Stabile IDs & Modelle| Repo["TimetableRepository"]
+    Repo -->|withTransaction| DB[("Room SQLite Database")]
+    Prefs["User Settings DataStore"] -->|groupsCode| Service["UserTimetableService"]
+    DB -->|SQL observeUserLessons| Service
+    Service -->|Filtered Lessons & Events| Mapper["CalenderDayMapper"]
+    Mapper -->|List of CalenderDay| UI["Compose UI / ViewModel"]
+```
 
-4. `UserSchedulePreferencesStore`
-   Speichert user-spezifische Regeln in DataStore.
-
-5. `UserTimetableService`
-   Kombiniert globale Repository-Daten mit den User-Preferences und baut daraus den persönlichen
-   Stundenplan.
-
-6. `CalenderDayMapper`
-   Baut aus `Lesson` und `Event` eine kalenderfreundliche Liste von `CalenderDay`.
+---
 
 ## Wichtige Grundidee
 
@@ -46,72 +101,59 @@ Es gibt zwei Datenebenen:
 
 ### 1. Globale Stundenplandaten
 
-Das sind alle `Lesson`- und `Event`-Einträge aus DaVinci.
-Diese Daten gelten für alle User und liegen lokal in Room.
+Das sind alle `Lesson`- und `Event`-Einträge aus DaVinci. Diese Daten gelten für alle User und
+liegen lokal in Room. Um Redundanzen zu vermeiden und die erste Normalform (1NF) zu gewährleisten,
+wurden alle Collections (Räume, Dozenten, Studiengänge) in relationale Zwischentabellen ausgelagert.
+Dadurch entfallen TypeConverter.
 
 ### 2. User-spezifische Auswahl
 
-Das sind nur persönliche Einstellungen und Regeln:
+Das sind persönliche Einstellungen und Filterwünsche des Nutzers:
 
-- welcher primäre `groupsCode` gewählt wurde
-- welche `extraLessons` aufgenommen werden
-- welche `hiddenLessons` ausgeblendet werden
-- ob das Setup schon abgeschlossen wurde
+- Welcher primäre `groupsCode` gewählt wurde (liegt im DataStore).
+- Welche Fremdmodule aufgenommen werden (`extra_lessons`-Tabelle in Room).
+- Welche Einheiten ausgeblendet werden (`hidden_lessons`-Tabelle in Room).
 
-Diese Daten liegen in DataStore.
+> [!NOTE]
+> Der persönliche Stundenplan wird nicht als eigene Tabelle gespeichert. Er wird reaktiv über
+> SQLite-JOINs direkt in Room gefiltert und zur Laufzeit berechnet.
 
-Wichtig:
+---
 
-Der persönliche Stundenplan wird nicht als eigene Tabelle gespeichert.
-Er wird immer aus globalen Daten plus User-Regeln berechnet.
+## Datenmodell
 
-## Datenmodelle
+### Lesson
 
-### `Lesson`
-
-Datei: `app/src/main/java/com/example/timetable/data/datenmodell/Lessons.kt`
+**Datei:** `Lesson.kt`
 
 `Lesson` repräsentiert eine konkrete Lehrveranstaltung wie Vorlesung, Übung oder Labor mit einer
-festen Uhrzeit an einem bestimmten Datum.
-Eine `Lesson` findet in einem bestimmten Raum mit Dozenten statt und ist einem oder mehreren
-`groupsCode`s zugeordnet.
+festen Uhrzeit an einem bestimmten Datum. Eine Lesson findet in einem bestimmten Raum mit Dozenten
+statt und ist einem oder mehreren `groupsCodes` zugeordnet.
 
 Wichtige Felder:
 
-- `id`
-- `title`
-- `date`
-- `startTime`
-- `endTime`
-- `rooms`
-- `building`
-- `teacher`
-- `groupsCode`
-- `change`
+- `id`: Die stabile, eindeutige ID (generiert aus `lessonRef#date` oder Fallback-Hash).
+- `title`: Name der Lehrveranstaltung.
+- `date`: Datum im Format `YYYY-MM-DD`.
+- `startTime` / `endTime`: Uhrzeiten im Format `HH:MM`.
+- `rooms`: Ein Set der Raumcodes (z. B. "4/302").
+- `building`: Gebäudekürzel (z. B. "H4").
+- `teacher`: Ein Set von Dozentenkürzeln.
+- `groupsCode`: Set von Studiengangscodes (z. B. "eti-SKIB_4").
+- `change`: Optionale Änderungsinformationen.
 
-Wichtig:
+> [!TIP]
+> Die ID wird im Parser deterministisch und stabil erzeugt. Raum- oder Dozentenänderungen haben
+> keinen Einfluss mehr auf die ID. Damit greifen im Speicher liegende User-Regeln, die auf diese
+`lessonId` verweisen, auch nach Updates stabil.
 
-`id` wird im Parser deterministisch aus den Lesson-Daten erzeugt.
-Damit kann eine konkrete einzelne Lesson über App-Starts hinweg wiedergefunden werden.
+### Event
 
-Aktuelle Einschränkung:
-
-Wenn sich für eine Lesson relevante Inhalte wie Raum oder Dozent ändern, ändert sich auch die
-generierte `id`.
-Dadurch können gespeicherte User-Regeln, die exakt auf diese `lessonId` zeigen, nach einem Update
-nicht mehr greifen.
-Dieser Punkt ist bekannt und aktuell akzeptiert.
-Wenn das später fachlich problematisch wird, muss die User-Regel-Speicherung enger an die Datenbank
-gekoppelt werden.
-
-### `Event`
-
-Datei: `app/src/main/java/com/example/timetable/data/datenmodell/Events.kt`
+**Datei:** `Event.kt`
 
 `Event` repräsentiert globale Termine wie Ferien, Feiertage oder Prüfungsphasen, die für die gesamte
-Hochschule gelten.
-Ein `Event` hat ein Start- und Enddatum, aber keine feste Uhrzeit, keinen Raum und keinen
-Studiengruppenbezug.
+Hochschule gelten. Ein Event hat ein Start- und Enddatum, aber keine feste Uhrzeit, keinen Raum und
+keinen Studiengruppenbezug.
 
 Wichtige Felder:
 
@@ -121,27 +163,26 @@ Wichtige Felder:
 - `endDate`
 - `category`
 
-Events können mehrere Tage umfassen.
-Die Verteilung auf einzelne Kalendertage macht später `CalenderDayMapper`.
+Events können mehrere Tage umfassen. Die Verteilung auf einzelne Kalendertage macht später
+`CalenderDayMapper.kt`.
 
-### `groupsCode`
+### groupsCode
 
-Ein `groupsCode` wie `eti-SKIB 4` oder `mb-SPB_4` repräsentiert typischerweise ein Semester eines
+Ein `groupsCode` wie `eti-SKIB_4` oder `mb-SPB_4` repräsentiert typischerweise ein Semester eines
 Studiengangs.
 
-Beispiel `eti-SKIB 4`:
+Beispiel `eti-SKIB_4`:
 
 - Fakultät: Elektrotechnik und Informatik
 - Studiengang: Softwareentwicklung und künstliche Intelligenz
 - Semester: 4
 
-Im Setup-Prozess wählt der Nutzer seinen primären `groupsCode`.
-Da Vorlesungen häufig von mehreren Studiengängen geteilt werden, besitzt jede `Lesson` ein Set von
-`groupsCode`s.
+Im Setup-Prozess wählt der Nutzer seinen primären `groupsCode`. Da Vorlesungen häufig von mehreren
+Studiengängen geteilt werden, besitzt jede Lesson ein Set von `groupsCodes`.
 
-### `CalenderDay`
+### CalenderDay
 
-Datei: `app/src/main/java/com/example/timetable/data/datenmodell/CalenderDay.kt`
+**Datei:** `CalenderDay.kt`
 
 `CalenderDay` ist die UI-freundliche Tagesansicht.
 
@@ -152,471 +193,199 @@ Felder:
 - `events`
 
 Bei regulärer Nutzung einer Tages- oder Wochenansicht sollte die UI mit `List<CalenderDay>`
-arbeiten.
+arbeiten. Typische Fälle für die direkte Nutzung von `Lesson` oder `Event` statt `CalenderDay` sind:
 
-Typische Fälle für die direkte Nutzung von `Lesson` oder `Event` statt `CalenderDay` sind:
-
-- Detail-Screen einer `Lesson`
-- Suche nach `Lesson`s für `extraLessons`
+- Detail-Screen einer Lesson
+- Suche nach Lessons für `extraLessons`
 - Filter- oder Auswahlmasken
-- spätere Notification-Logik
+- Notification-Logik zur Änderungserkennung
 
-### `extraLessons`
+### extraLessons
 
-`extraLessons` sind `Lesson`s, die der Nutzer zusätzlich in seinem Plan anzeigen möchte, obwohl sie
-nicht zu seinem primären `groupsCode` gehören.
+`extraLessons` sind Lessons, die der Nutzer zusätzlich in seinem Plan anzeigen möchte, obwohl sie
+nicht zu seinem primären `groupsCode` gehören. Technisch werden diese relational in SQLite in der
+Tabelle `extra_lessons` gespeichert. Ein Fremdschlüssel verweist bei Einzelterminen auf die stabile
+`LessonEntity.id`.
 
-Technisch werden diese nicht als komplette `Lesson` gespeichert, sondern als `LessonSelection`.
+### hiddenLessons
 
-### `hiddenLessons`
+`hiddenLessons` sind Regeln für Lessons, die der Nutzer aus dem Plan ausblenden möchte. Technisch
+werden diese in SQLite in der Tabelle `hidden_lessons` gespeichert. Ein Fremdschlüssel verweist bei
+Einzelterminen auf die stabile `LessonEntity.id`.
 
-`hiddenLessons` sind Regeln für `Lesson`s, die der Nutzer vom Plan ausblenden möchte.
+### UserSchedulePreferences
 
-Technisch werden diese nicht als komplette `Lesson` gespeichert, sondern als `HiddenLessonRule`.
+**Datei:** `UserSchedulePreferences.kt`
 
-### `UserSchedulePreferences`
-
-Datei: `app/src/main/java/com/example/timetable/data/datenmodell/UserSchedulePreferences.kt`
-
-Felder:
+Enthält nur noch einfache Einstellungen wie:
 
 - `isSetupComplete`
 - `groupsCode`
-- `extraLessons`
-- `hiddenLessons`
+- `isDynamicColorEnabled`
+- `isCancellationAlertEnabled`
+- `isRoomChangeAlertEnabled`
 
-Zusätzliche Modelle:
+Da komplexe JSON-Regeln in relationale Room-Tabellen ausgelagert wurden, bleibt diese
+Preferences-Klasse klein, performant und typsicher.
 
-- `LessonSelection` - Ermöglicht die Auswahl einzelner Termine (über `lessonId`) oder ganzer Kurse /
-  Module (über `title` und `groupsCode`).
-- `HiddenLessonRule` - Definiert Ausblendungsregeln. Unterstützt das Ausblenden einzelner Termine (
-  über `lessonId`), ganzer Kurse / Module (über `title`) oder ganzer Studiengänge (über
-  `groupsCode`).
-
-Diese Typen beschreiben keine kompletten Stundenplandaten, sondern nur User-Regeln.
-Das hält Preferences klein und unabhängig von der globalen Datenmenge.
+---
 
 ## Zuständigkeiten der Klassen
 
-## `DaVinciApi`
+### DaVinciApi
 
-Datei: `app/src/main/java/com/example/timetable/data/services/DaVinciApi.kt`
+**Datei:** `DaVinciApi.kt`
 
-Zweck:
+- Lädt die DaVinci-JSON aus dem Netz.
+- Berechnet Hash und Größe der Antwort zur Cache-Validierung.
+- Parst die Root-JSON in `DaVinciResponse`.
+- Läuft vollständig auf `Dispatchers.IO`.
 
-- lädt die DaVinci-JSON aus dem Netz
-- berechnet Hash und Größe der Antwort
-- parsed die grobe Root-JSON in `DaVinciResponse`
-- läuft vollständig auf `Dispatchers.IO`
+### LessonParser
 
-Wichtige Methoden:
+**Datei:** `LessonParser.kt`
 
-- `download()`
-- `downloadSnapshot()`
+- `lessonTimes` aus der API in `Lesson` umwandeln.
+- `eventTimes` aus der API in `Event` umwandeln.
+- Daten und Zeiten formatieren.
+- Stabile Lesson-IDs erzeugen. Wenn `lessonRef` vorhanden ist, wird `lessonRef#date` genutzt,
+  ansonsten wird ein stabiler Fallback-Hash (ohne Räume/Dozenten) erzeugt.
+- Bei strukturell defekter API-Antwort fail-fast abbrechen.
 
-`downloadSnapshot()` liefert:
+### CalenderDayMapper
 
-- `rawJson`
-- `response`
-- `jsonSize`
-- `jsonHash`
+**Datei:** `CalenderDayMapper.kt`
 
-Wichtig:
+- Lessons nach Datum gruppieren und chronologisch sortieren.
+- Events auf alle betroffenen Tage verteilen.
+- Daraus `List<CalenderDay>` bauen.
 
-`DaVinciApi` speichert nichts lokal.
-Lokale Speicherung passiert im `TimetableRepository` über Room.
+### TimetableRepository
 
-## `LessonParser`
+**Datei:** `TimetableRepository.kt`
 
-Datei: `app/src/main/java/com/example/timetable/data/services/LessonParser.kt`
+- Lädt Stundenplandaten relational aus Room.
+- Lädt neue Daten aus dem Netz und speichert sie relational in Room über eine sichere Transaktion (
+  `database.withTransaction`).
+- Stellt globale Flows bereit (`lessonsFlow`, `eventsFlow`, `calenderDaysFlow`).
 
-Zweck:
+#### Lokale Speicherung in Room:
 
-- `lessonTimes` aus der API in `Lesson` umwandeln
-- `eventTimes` aus der API in `Event` umwandeln
-- Daten und Zeiten formatieren
-- stabile Lesson-IDs erzeugen
-- bei strukturell defekter API-Antwort fail-fast abbrechen
+- `LessonEntity.kt` (Tabelle: `lessons` - normalisiert, keine Kollektionen)
+- Zwischentabellen für Beziehungen in `LessonRelations.kt` (`lesson_rooms`, `lesson_teachers`,
+  `lesson_groups`)
+- `EventEntity.kt` (Tabelle: `events`)
+- `SyncMetadataEntity.kt` (Tabelle: `sync_metadata` mit Hash und Größe)
 
-Wichtige Methoden:
+### UserSchedulePreferencesStore
 
-- `parseLessons(...)`
-- `parseLesson(...)`
-- `parseEvents(...)`
-- `parseEvent(...)`
-- `parseChange(...)`
+**Datei:** `UserSchedulePreferencesStore.kt`
 
-Wichtig:
+- Speichert User-Einstellungen in DataStore.
+- Liefert einen reaktiven `Flow<UserSchedulePreferences>`.
 
-Der Parser gruppiert nicht.
-Er erzeugt nur saubere Kotlin-Modelle.
-Kalenderlogik gehört nicht in den Parser.
+### UserTimetableService
 
-Außerdem gilt:
+**Datei:** `UserTimetableService.kt`
 
-Wenn ein Feld wie `roomCodes` oder `classCodes` in der API nicht als JSON-Array geliefert wird,
-bricht der Parser bewusst mit einer Exception ab.
-Das ist absichtlich so, damit kaputte Serverdaten nicht still downstream zu schwer auffindbaren
-Fehlern führen.
+- Verwalte die Filterregeln (`extra_lessons` und `hidden_lessons`) relational in Room.
+- Bietet reaktive Flows für den gefilterten Stundenplan (`userLessonsFlow()`,
+  `userCalenderDaysFlow()`).
+- Delegiert die Filterberechnungen reaktiv direkt an SQLite (über die DAO-Methode
+  `observeUserLessons`).
 
-## `CalenderDayMapper`
+### TimetableAlertDetector
 
-Datei: `app/src/main/java/com/example/timetable/data/services/CalenderDayMapper.kt`
+**Datei:** `TimetableAlertDetector.kt`
 
-Zweck:
+- Vergleicht den alten Stundenplan des Nutzers mit den neu synchronisierten globalen
+  Stundenplandaten.
+- Detektiert Ausfälle (Einheit existiert im neuen Plan nicht mehr) und Raumänderungen (Raum weicht
+  ab) unter Verwendung stabiler Koordinatenvergleiche.
+- Liefert eine Liste von `TimetableAlert`-Objekten an Services oder Worker zur Anzeige lokaler
+  Push-Benachrichtigungen.
 
-- Lessons nach Datum gruppieren
-- Lessons pro Tag nach Startzeit sortieren
-- Events auf alle Tage zwischen `startDate` und `endDate` verteilen
-- daraus `List<CalenderDay>` bauen
-
-Wichtige Methode:
-
-- `build(lessons, events)`
-
-Die UI sollte für Kalenderansichten meistens das Ergebnis dieser Methode anzeigen.
-
-## `TimetableRepository`
-
-Datei: `app/src/main/java/com/example/timetable/data/TimetableRepository.kt`
-
-Dies ist die zentrale globale Datenklasse.
-
-Zweck:
-
-- lädt Stundenplandaten aus Room
-- lädt neue Daten aus dem Netz
-- aktualisiert Room bei Änderungen
-- hält den zuletzt geladenen Zustand zusätzlich im Speicher
-- stellt Flows und einen Sync-Status für UI oder Service bereit
-
-### Lokale Speicherung
-
-`TimetableRepository` speichert in Room:
-
-- `LessonEntity`
-- `EventEntity`
-- `SyncMetadataEntity`
-
-`SyncMetadataEntity` enthält:
-
-- `jsonHash`
-- `jsonSize`
-- `syncedAtMillis`
-
-Damit kann geprüft werden, ob neue Serverdaten wirklich anders sind.
-
-### Sync-State
-
-Das Repository stellt zusätzlich einen `StateFlow` bereit:
-
-- `syncState: StateFlow<RepositorySyncState>`
-
-Mögliche Zustände:
-
-- `Idle`
-- `LoadingLocal`
-- `Syncing`
-- `Ready`
-- `Error`
-
-Das UI oder ViewModel sollte diesen State beobachten, um differenziert auf folgende Fälle reagieren
-zu können:
-
-- lokale Daten werden geladen
-- Netzsync läuft
-- letzter lokaler Stand ist aktiv
-- erster Start ohne Internet ist fehlgeschlagen
-
-### Wichtige Methoden
-
-#### `initialize()`
-
-Verwendung:
-
-- App-Start
-- erster Einstieg ins Repository
-
-Verhalten:
-
-- wenn Daten in Room vorhanden sind, werden sie aus Room gelesen
-- wenn Room leer ist, wird aus dem Netz geladen und anschließend in Room gespeichert
-
-Dies ist die normale Startmethode.
-
-#### `loadFromDatabase()`
-
-Verwendung:
-
-- wenn explizit nur der lokale DB-Stand neu in den Speicher geladen werden soll
-
-Verhalten:
-
-- liest nur aus Room
-- macht keinen Netzaufruf
-- gibt `null` zurück, wenn die DB leer ist
-
-Hinweis:
-
-Die ältere Methode `loadFromCache()` existiert nur noch als abwärtskompatibler Alias und sollte
-nicht mehr neu verwendet werden.
-
-#### `reloadJson()`
-
-Verwendung:
-
-- manuelles hartes Refresh
-- Pull-to-refresh
-- Debugzwecke
-
-Verhalten:
-
-- lädt neu aus dem Netz
-- parsed neu
-- ersetzt den kompletten Room-Inhalt
-- aktualisiert den In-Memory-Zustand
-
-#### `updateJsonIfNeeded()`
-
-Verwendung:
-
-- regelmäßige Update-Prüfung
-- App-Start nach `initialize()`
-- späterer Background-Worker
-
-Verhalten:
-
-- lädt neues JSON vom Server
-- vergleicht `jsonHash` mit gespeicherten Metadaten
-- ersetzt Room nur, wenn sich die Daten wirklich geändert haben
-- bei Offline-Fehler und vorhandenen lokalen Daten bleibt der letzte lokale Stand erhalten
-- bei Offline-Fehler ohne lokale Daten wird die Exception weitergegeben und zusätzlich
-  `syncState = Error` gesetzt
-
-Rückgabe:
-
-- `true` wenn neue Daten übernommen wurden
-- `false` wenn nichts geändert wurde oder nur lokaler Fallback verwendet wurde
-
-### Wichtige Getter
-
-- `getAllLessons()`
-- `getAllEvents()`
-- `getAllCalenderDays()`
-- `getLessonsByGroupsCode(groupsCode)`
-- `getLessonById(lessonId)`
-- `getLessonsByTitleAndGroupsCode(title, groupsCode)`
-- `getLessonsByDate(date)`
-- `getEventsByDate(date)`
-- `getCalenderDay(date)`
-
-Diese Getter arbeiten auf dem aktuell geladenen In-Memory-Zustand.
-Darum muss vor der ersten Benutzung mindestens einmal erfolgreich geladen worden sein.
-Normalerweise bedeutet das: zuerst `initialize()` aufrufen.
-
-### Flows aus dem Repository
-
-- `lessonsFlow`
-- `eventsFlow`
-- `calenderDaysFlow`
-- `syncState`
-
-Für reaktive UI-Anbindung sollten diese Flows bevorzugt werden.
-
-Hinweis zur Architektur:
-
-Der aktuelle Stand ist bewusst hybrid:
-
-- Room ist die persistente Quelle für globale Daten
-- die Repository-Getter spiegeln den zuletzt geladenen In-Memory-Zustand
-
-Das ist funktional in Ordnung, aber noch nicht die strengste mögliche
-Single-Source-of-Truth-Variante.
-Wenn später Notification- oder Worker-Logik umfangreicher wird, sollte geprüft werden, ob bestimmte
-Getter direkt DAO-basiert als `suspend`-Abfragen angeboten werden sollen.
-
-## `UserSchedulePreferencesStore`
-
-Datei: `app/src/main/java/com/example/timetable/data/UserSchedulePreferencesStore.kt`
-
-Zweck:
-
-- speichert User-Einstellungen in DataStore
-- liefert einen `Flow<UserSchedulePreferences>`
-- fängt beschädigte JSON-Regeln defensiv ab
-
-Wichtige API:
-
-- `preferencesFlow`
-- `load()`
-- `save(...)`
-- `update(...)`
-- `clear()`
-
-Wichtig:
-
-Wenn der JSON-Inhalt von `extraLessons` oder `hiddenLessons` beschädigt ist, gibt der Store
-nicht-crashend leere Regeln zurück.
-Das verhindert, dass eine korrupte DataStore-Value sofort den gesamten Ladepfad blockiert.
-
-## `UserTimetableService`
-
-Datei: `app/src/main/java/com/example/timetable/data/services/UserTimetableService.kt`
-
-Dies ist die wichtigste Klasse für den persönlichen Stundenplan.
-
-Zweck:
-
-- liest globale Stundenplandaten aus `TimetableRepository`
-- liest User-Regeln aus `UserSchedulePreferencesStore`
-- baut daraus die user-spezifische Anzeige
-
-### Flows
-
-- `preferencesFlow`
-- `userLessonsFlow()`
-- `userCalenderDaysFlow()`
-
-Diese Flows sind für die UI-Anbindung besonders wichtig.
-
-### Setup-Funktionen
-
-- `setSetupComplete(isSetupComplete)`
-- `setGroupsCode(groupsCode)`
-- `completeSetup(groupsCode)`
-
-Typischer Fall:
-
-Nach dem Setup-Screen sollte meistens `completeSetup(groupsCode)` verwendet werden.
-
-### Extra-Lessons verwalten
-
-- `addExtraLesson(groupsCode, title)`
-- `addExtraLessonById(lessonId)`
-- `removeExtraLesson(groupsCode, title)`
-- `removeExtraLessonById(lessonId)`
-
-### Lessons ausblenden oder wieder anzeigen
-
-- `hideLesson(groupsCode, title)`
-- `hideLessonById(lessonId)`
-- `showLesson(groupsCode, title)`
-- `showLessonById(lessonId)`
-- `showAllLessonsByTitle(title)`
-
-### User-Stundenplan bauen
-
-- `buildUserLessons()`
-- `buildUserCalenderDays()`
-
-Diese Methoden sind gut für direkte `suspend`-Aufrufe.
-Für reaktive UI ist aber `userLessonsFlow()` oder `userCalenderDaysFlow()` meist besser.
+---
 
 ## Reihenfolge und Atomarität der User-Regeln
 
-Die Aufbereitung im `UserTimetableService` läuft deterministisch in dieser Reihenfolge:
+Die Filterlogik ist vollständig in die SQL-Datenbankabfrage in `LessonDao.observeUserLessons`
+gekapselt:
 
-1. Basis-Lessons über den primären `groupsCode` sammeln
-2. `extraLessons` zusätzlich auflösen
-3. beide Mengen zusammenführen
-4. über `Lesson.id` entdoppeln
-5. `hiddenLessons` anwenden
-6. Ergebnis nach Datum und Startzeit sortieren
+1. Nimm alle Vorlesungen des primären `groupsCode` des Benutzers.
+2. Füge alle Vorlesungen hinzu, die der Benutzer manuell als Fremdmodul ausgewählt hat (entweder als
+   Einzeltermin über die `lessonId` oder kursweit über Titel und Studiengang).
+3. Blende alle Vorlesungen aus, für die eine Ausblendungsregel existiert (entweder als Einzeltermin
+   über die `lessonId` oder kursweit über Titel und optionalen Studiengang).
+4. Sortiere das Ergebnis chronologisch nach Datum und Startzeit.
 
-Das bedeutet:
+> [!IMPORTANT]
+> Blacklist-Regeln (`hidden_lessons`) gewinnen immer gegen Whitelist-Regeln (`extra_lessons`). Ist
+> dieselbe Lesson sowohl extra als auch hidden, wird sie ausgeblendet.
 
-- `hiddenLessons` gewinnen immer gegen `extraLessons`
-- wenn dieselbe `Lesson` sowohl extra als auch hidden ist, wird sie am Ende nicht angezeigt
-
-### Was kann konkret ein- oder ausgeblendet werden?
-
-Es gibt zwei Ebenen:
-
-1. Einzeln per `lessonId`
-   Damit lässt sich genau ein konkreter Termin ein- oder ausblenden.
-   Das ist der richtige Weg für Einzelfälle wie nur eine bestimmte Woche.
-
-2. Fachlich per `title` und optional `groupsCode`
-   Damit lassen sich alle passenden Termine einer Lehrveranstaltung ausblenden.
-
-Wichtig für Kurse mit Vorlesung und Labor:
-
-Wenn Vorlesung und Labor denselben `title` teilen, greift eine Titelregel auf beide.
-Wenn nur ein einzelner Termin betroffen sein soll, muss mit `lessonId` gearbeitet werden.
+---
 
 ## Datenfluss im Detail
 
 ### Erstes Laden der App
 
-1. UI oder ViewModel erzeugt `TimetableRepository`
-2. `initialize()` wird aufgerufen
-3. Repository prüft Room
-4. wenn Room leer ist, wird aus dem Netz geladen
-5. Parser erzeugt `Lesson` und `Event`
-6. Repository speichert alles in Room
-7. Repository baut `CalenderDay`
-8. UI kann Daten anzeigen
+1. UI oder ViewModel erzeugt `TimetableRepository`.
+2. `initialize()` wird aufgerufen.
+3. Repository prüft Room; falls leer, wird das API-JSON über `reloadJson()` geladen.
+4. Parser erzeugt `Lesson` und `Event`.
+5. Repository speichert alles transaktional in Room (befüllt `lessons` sowie relationale
+   Zwischentabellen).
+6. UI zeigt Daten reaktiv an.
 
 ### Erstes Laden der App ohne Internet
 
-1. ViewModel erzeugt `TimetableRepository`
-2. `initialize()` wird aufgerufen
-3. Repository prüft Room und stellt fest, dass Room leer ist
-4. Repository versucht, JSON über `reloadJson()` aus dem Netz zu laden
-5. Netzwerkaufruf schlägt fehl (keine Internetverbindung)
-6. `syncState` wechselt auf `RepositorySyncState.Error` mit `hasLocalDate = false`
-7. Exception wird weitergeworfen und muss vom aufrufenden Scope abgefangen werden
-8. UI zeigt einen blockierenden Fehlerbildschirm mit Retry-Option
+1. `initialize()` wird aufgerufen.
+2. Room ist leer, also wird versucht, das Netz-JSON über `reloadJson()` zu holen.
+3. Netzwerk schlägt fehl; `syncState` wechselt auf `Error` mit `hasLocalData = false`.
+4. Die Exception wird weitergeworfen, und die UI muss reagieren (z. B. Retry-Bildschirm anzeigen).
 
 ### Späterer App-Start ohne Internet
 
-1. Repository wird erzeugt
-2. `initialize()` wird aufgerufen
-3. Room enthält bereits Daten
-4. Daten werden lokal geladen
-5. UI funktioniert ohne Netz
+1. `initialize()` wird aufgerufen.
+2. Room enthält bereits Daten aus dem vorherigen Sync.
+3. Daten werden lokal gelesen und in den RAM-Cache geladen; UI zeigt Offline-Daten an.
 
 ### Update-Prüfung
 
-1. `updateJsonIfNeeded()` wird aufgerufen
-2. `DaVinciApi` lädt neues JSON
-3. Repository vergleicht `jsonHash` mit `SyncMetadataEntity`
-4. wenn verschieden: neue Daten werden geparst und Room ersetzt
-5. wenn gleich: bestehende Daten bleiben erhalten
+1. `updateJsonIfNeeded()` lädt das neue JSON und vergleicht den Hash mit `SyncMetadataEntity`.
+2. Wenn verschieden: Die alten Room-Tabellen werden gelöscht (was kaskadierend die Zwischentabellen
+   leert) und die neuen Daten werden relational eingefügt.
+3. Wenn gleich: Keine Änderungen in Room, RAM-Cache wird neu aufgebaut.
 
 ### Persönlicher Stundenplan eines Users
 
-1. User wählt einen `groupsCode`
-2. der Code wird in DataStore gespeichert
-3. `UserTimetableService` liest globale Lessons aus dem Repository
-4. Basis-Lessons werden nach `groupsCode` gefiltert
-5. `extraLessons` werden zusätzlich aufgelöst
-6. `hiddenLessons` werden herausgefiltert
-7. daraus wird `List<CalenderDay>` gebaut
+1. User schließt das Setup ab. Der `groupsCode` wird im DataStore gespeichert.
+2. `UserTimetableService` beobachtet die Einstellungsänderung.
+3. Die Room-Abfrage `observeUserLessons` wird mit dem neuen Code aufgerufen.
+4. SQLite filtert und sortiert den Stundenplan und liefert das Ergebnis reaktiv an den
+   `CalenderDayMapper` und die UI zurück.
+
+---
 
 ## Was die UI später wirklich benutzen sollte
 
-Die UI sollte nicht direkt mit Parser oder DAOs arbeiten.
-Die UI sollte je nach Fall nur mit diesen Klassen arbeiten:
+Die UI darf niemals direkt mit Parsern, Entitäten oder Room-DAOs kommunizieren. Sie kommuniziert
+ausschließlich mit:
 
-- `TimetableRepository`
-- `UserTimetableService`
-- `UserSchedulePreferencesStore` höchstens für spezielle Setup- oder Debugfälle
+- `TimetableRepository.kt` (für globale Aktionen und Sync-Status)
+- `UserTimetableService.kt` (für den persönlichen Kalender und das Regel-Management)
+
+---
 
 ## Empfohlener UI-Startablauf
 
-### Für globale Daten
-
-Im `ViewModel` oder App-Start:
+### Für globale Daten im ViewModel:
 
 ```kotlin
 class TimetableViewModel(
-    application: Application
+    application: Application,
+    private val repository: TimetableRepository
 ) : AndroidViewModel(application) {
-
-    private val repository = TimetableRepository(
-        context = application.applicationContext
-    )
 
     val calenderDays = repository.calenderDaysFlow
     val syncState = repository.syncState
@@ -626,34 +395,22 @@ class TimetableViewModel(
             try {
                 repository.initialize()
                 repository.updateJsonIfNeeded()
-            } catch (exception: Exception) {
-                // Optional zusätzliche Fehlerbehandlung.
-                // Die UI kann parallel auch repository.syncState beobachten.
+            } catch (e: Exception) {
+                // Fehlerbehandlung für UI
             }
         }
     }
 }
 ```
 
-### Für den persönlichen Stundenplan
+### Für den persönlichen Stundenplan:
 
 ```kotlin
 class UserTimetableViewModel(
-    application: Application
+    application: Application,
+    private val repository: TimetableRepository,
+    private val userService: UserTimetableService
 ) : AndroidViewModel(application) {
-
-    private val repository = TimetableRepository(
-        context = application.applicationContext
-    )
-
-    private val preferencesStore = UserSchedulePreferencesStore(
-        application.applicationContext.userSchedulePreferencesDataStore
-    )
-
-    private val userService = UserTimetableService(
-        repository = repository,
-        preferencesStore = preferencesStore
-    )
 
     val userCalenderDays = userService.userCalenderDaysFlow()
     val preferences = userService.preferencesFlow
@@ -664,15 +421,15 @@ class UserTimetableViewModel(
             try {
                 repository.initialize()
                 repository.updateJsonIfNeeded()
-            } catch (exception: Exception) {
-                // Optional zusätzliche Fehlerbehandlung.
+            } catch (e: Exception) {
+                // Fehlerbehandlung
             }
         }
     }
 }
 ```
 
-### In Compose
+### In Compose:
 
 ```kotlin
 @Composable
@@ -680,58 +437,41 @@ fun TimetableScreen(viewModel: UserTimetableViewModel) {
     val days by viewModel.userCalenderDays.collectAsState(initial = emptyList())
     val syncState by viewModel.syncState.collectAsState()
 
-    // days rendern
-    // syncState für loading/error/offline anzeigen
+    // days rendern, syncState für Ladeanimation/Offline-Banner nutzen
 }
 ```
+
+---
 
 ## Welche Methode wann benutzt werden sollte
 
 ### Bei App-Start
 
-Nutzen:
-
-- `repository.initialize()`
-
-Optional direkt danach:
-
-- `repository.updateJsonIfNeeded()`
+- `repository.initialize()` gefolgt von `repository.updateJsonIfNeeded()`
 
 ### Für Setup-Screen
-
-Nutzen:
 
 - `userService.completeSetup(groupsCode)`
 
 ### Für normales Anzeigen des persönlichen Stundenplans
 
-Nutzen:
-
 - `userService.userCalenderDaysFlow()`
 
 ### Für einmalige direkte Abfragen
 
-Nutzen:
-
 - `repository.getLessonsByGroupsCode(...)`
 - `repository.getLessonById(...)`
 - `repository.getLessonsByTitleAndGroupsCode(...)`
-- `userService.buildUserLessons()`
-- `userService.buildUserCalenderDays()`
 
 ### Für manuelles Refresh
-
-Nutzen:
 
 - `repository.reloadJson()`
 
 ### Für stilles Hintergrund-Update
 
-Nutzen:
+- `repository.updateJsonIfNeeded()` (z. B. periodisch über einen WorkManager)
 
-- `repository.updateJsonIfNeeded()`
-
-Später für Notifications oder periodische Updates ist dafür ein `PeriodicWorkRequest` sinnvoll.
+---
 
 ## Typische Anwendungsfälle
 
@@ -745,7 +485,7 @@ viewModelScope.launch {
 
 ### 2. User fügt ein Fremdmodul hinzu
 
-Wenn die Auswahl über Titel und Code läuft:
+**Kursweit über Titel:**
 
 ```kotlin
 viewModelScope.launch {
@@ -756,7 +496,7 @@ viewModelScope.launch {
 }
 ```
 
-Wenn die Auswahl über eine konkrete Lesson laufen soll:
+**Einzelner Termin über ID:**
 
 ```kotlin
 viewModelScope.launch {
@@ -791,139 +531,148 @@ viewModelScope.launch {
 }
 ```
 
-oder
-
-```kotlin
-viewModelScope.launch {
-    userService.showLesson(
-        groupsCode = "mb-MBB_4",
-        title = "Mathe"
-    )
-}
-```
+---
 
 ## Fehler- und Offlineverhalten
 
 ### Offline beim normalen App-Start mit bestehenden lokalen Daten
 
-Wenn Room schon Daten hat, funktioniert die App weiter.
-Es wird lokal gelesen.
+Wenn Room bereits Daten hat, wird lokal gelesen. Die App startet fehlerfrei offline.
 
 ### Offline beim Update
 
-`updateJsonIfNeeded()` fängt Netzfehler ab.
-Wenn bereits lokale Daten existieren, bleiben diese aktiv und die Methode liefert `false` zurück.
+`updateJsonIfNeeded()` fängt Netzfehler ab. Lokale Daten bleiben aktiv, die Methode liefert `false`
+zurück.
 
 ### Offline beim allerersten Start ohne lokale Daten
 
-Dann kann `initialize()` nicht erfolgreich laden, weil weder Room noch Netz Daten liefern.
-In diesem Fall wird ein `Error` in `syncState` gesetzt und die Exception weitergegeben.
+`initialize()` scheitert. `syncState` wechselt auf `Error` mit `hasLocalData = false`. Exception
+wird weitergegeben, die UI sollte einen blockierenden Fehlerbildschirm mit Wiederholungs-Option
+anbieten.
 
-Empfehlung für die UI:
-
-- `syncState` beobachten
-- zusätzlich den Start-Call im ViewModel in `try-catch` kapseln
-- Retry-Button anbieten
+---
 
 ## Wichtige technische Hinweise
 
-### 1. Vor Getter-Nutzung initialisieren
+1. **Vor Getter-Nutzung initialisieren**: Vor der Benutzung der einmaligen RAM-Getter im Repository
+   muss mindestens einmal `repository.initialize()` aufgerufen worden sein, um den Speicher-Cache
+   aufzubauen.
+2. **Für UI lieber Flows als einmalige Getter**: Verwende für Compose-basierte Benutzeroberflächen
+   immer die reaktiven Flows (`userCalenderDaysFlow()`), da diese sich bei Regeländerungen
+   automatisch aktualisieren.
+3. **Netzwerk- und Parsing-Logik nicht in die UI verschieben**: Die UI darf keine Netzaufrufe
+   tätigen, nicht direkt in die DB schreiben und keine API-JSONs verarbeiten. Diese Komplexität ist
+   vollständig in den Daten- und Service-Klassen gekapselt.
+4. **CalenderDay ist absichtlich die Anzeigeform**: Der Kalender-Screen rendert `List<CalenderDay>`.
+   Direkte Vorlesungslisten sind für Detail-Ansichten oder Suchen gedacht.
+5. **Schreibweise CalenderDay**: Im Projekt heißt die Klasse `CalenderDay` (mit "e"). Aus Gründen
+   der Konsistenz muss diese Schreibweise beibehalten werden.
 
-Vor allem diese Methoden setzen voraus, dass vorher geladen wurde:
-
-- `getAllLessons()`
-- `getAllEvents()`
-- `getAllCalenderDays()`
-- `getLessonsByGroupsCode(...)`
-- `getLessonById(...)`
-- `getLessonsByTitleAndGroupsCode(...)`
-
-Deshalb immer zuerst:
-
-```kotlin
-repository.initialize()
-```
-
-### 2. Für UI lieber Flows als einmalige Getter
-
-Getter sind gut für direkte Logik.
-Für Compose oder andere Live-UI sind Flows robuster:
-
-- `repository.calenderDaysFlow`
-- `repository.syncState`
-- `userService.userCalenderDaysFlow()`
-
-### 3. Netzwerk- und Parsing-Logik nicht in die UI verschieben
-
-Die UI sollte nicht selbst parsen, nicht selbst Room beschreiben und nicht selbst JSON vergleichen.
-Diese Arbeit gehört in:
-
-- `DaVinciApi`
-- `LessonParser`
-- `TimetableRepository`
-- `UserTimetableService`
-
-### 4. `CalenderDay` ist absichtlich die Anzeigeform
-
-Für Kalenderansichten ist `CalenderDay` das primäre Zielmodell.
-Direkte `Lesson`- oder `Event`-Listen sind nur für Spezialfälle sinnvoll.
-
-### 5. Schreibweise `CalenderDay`
-
-Im Projekt heißt die Klasse aktuell `CalenderDay`.
-Sprachlich wäre `CalendarDay` korrekter.
-Solange keine Umbenennung gewollt ist, muss im Rest des Codes aber der aktuelle Name benutzt werden.
+---
 
 ## Bewusst nicht umgesetzt
 
-Einige Diskussionspunkte wurden nicht sofort in Code umgebaut, weil sie größere
-Architekturänderungen wären:
+- Vollständige Benachrichtigungs-Worker-Infrastruktur: Die Registrierung und Periodizität des
+  Workers gehören in die View- / App-Schicht. Der Daten-Layer liefert mit `TimetableAlertDetector`
+  lediglich die Business-Logik zur Änderungserkennung.
 
-- komplette Verlagerung aller User-Regeln von DataStore nach Room
-- vollständiges Entfernen des Repository-In-Memory-Zustands zugunsten rein DAO-basierter Getter
-- vollständige Notification-Architektur über Worker und direkte DB-Abfragen
-
-Diese Punkte sind valide, aber größer als ein gezielter Stabilitäts- oder Qualitäts-Patch.
+---
 
 ## Sinnvolle nächste Schritte
 
-### 1. Ein echtes `ViewModel` für Stundenplan bauen
+1. **ViewModel-Anbindung**: Erstellen von ViewModels, die die Startlogik (`initialize` /
+   `updateJsonIfNeeded`) kapseln und die Flows für Compose bereitstellen.
+2. **WorkManager-Integration**: Einrichten eines periodischen Hintergrund-Workers, der
+   `repository.updateJsonIfNeeded()` triggert und im Fall von Änderungen über
+   `TimetableAlertDetector` Push-Benachrichtigungen sendet.
 
-Wenn noch nicht vorhanden, sollte ein ViewModel die Startlogik kapseln:
-
-- `initialize()`
-- `updateJsonIfNeeded()`
-- Beobachtung von `syncState`
-- Exponieren von `userCalenderDaysFlow()`
-
-### 2. UI-Status klar abbilden
-
-Sinnvoll ist ein UI-State wie:
-
-- `loading`
-- `data`
-- `error`
-- `isOfflineFallback`
-
-### 3. Sync-Metadaten für UI lesbar machen
-
-Wenn die UI später anzeigen soll, wann zuletzt synchronisiert wurde, kann das Repository noch eine
-Methode oder einen Flow für `SyncMetadataEntity` bekommen.
-
-### 4. User-Regeln fachlich schärfen
-
-Falls die `lessonId`-Instabilität bei Raum- oder Dozentenänderungen zu Problemen führt, muss
-entschieden werden, ob User-Regeln künftig relational in Room abgelegt werden sollen.
+---
 
 ## Kurzfassung
 
-Für die spätere UI-Anbindung gilt:
+- Globale Daten kommen aus `TimetableRepository.kt`.
+- Einstellungen kommen aus `UserSchedulePreferencesStore.kt`.
+- Regeln und gefilterte Stundenpläne kommen aus `UserTimetableService.kt`.
+- Room dient als persistenter SQLite-Speicher.
+- Kalenderdaten werden reaktiv über Flows gestreamt.
 
-- globale Daten kommen aus `TimetableRepository`
-- persönliche Auswahl kommt aus `UserSchedulePreferencesStore`
-- persönlicher Stundenplan wird von `UserTimetableService` gebaut
-- Room ist die lokale Offline-Quelle
-- DataStore speichert User-Regeln
-- für die UI sind Flows die wichtigste Schnittstelle
-- die wichtigste Startmethode ist `repository.initialize()`
-- für Fehler- und Offline-Handling sollte `repository.syncState` beobachtet werden
+---
+
+## Guidelines für die ViewModel-Implementierung
+
+> [!IMPORTANT]
+> Diese Richtlinien müssen bei der Implementierung von ViewModels strikt beachtet werden, um die
+> Architektur sauber zu halten und Kompilierfehler oder fehlerhafte Datenflüsse zu vermeiden.
+
+1. **Kein Direktzugriff auf interne Datenklassen oder DAOs**:
+    - Ein ViewModel darf niemals direkt auf `LessonDao`, `UserRulesDao` oder
+      `UserSchedulePreferencesStore` zugreifen.
+    - Alle Interaktionen bezüglich des gefilterten Stundenplans, der Einstellungen und der
+      Filterregeln müssen über `UserTimetableService.kt` laufen.
+    - Alle Interaktionen bezüglich der globalen Stundenplandaten und Synchronisationsprozesse müssen
+      über `TimetableRepository.kt` laufen.
+2. **Kapselung asynchroner Operationen**:
+    - Schreiboperationen wie `completeSetup()`, `addExtraLessonById()` oder `hideLessonById()` sind
+      `suspend`-Funktionen. Rufe sie immer im `viewModelScope` des ViewModels auf.
+    - Synchronisationsmethoden wie `initialize()`, `reloadJson()` oder `updateJsonIfNeeded()` sind
+      ebenfalls `suspend`-Funktionen und müssen im `viewModelScope` gestartet und mit `try-catch`
+      -Blöcken abgesichert werden.
+3. **Reaktive Datenbindung in Compose**:
+    - Exponiere Datenströme als Kotlin-`Flow` (z. B. `userService.userCalenderDaysFlow()`).
+    - Nutze im ViewModel vorzugsweise
+      `.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())`, um die
+      Kälte-Flows der DB in heiße `StateFlows` umzuwandeln. Das verhindert, dass die Datenbank bei
+      jedem Neuausrichten des UI-Bildschirms (Recomposition) neu abgefragt wird.
+4. **Kombination von UI-States**:
+    - Beobachte den `syncState` des Repositories reaktiv, um Lade- (`LoadingLocal`, `Syncing`),
+      Fehler- (`Error`) oder Bereitschaftszustände (`Ready`) an die UI weiterzugeben.
+
+---
+
+## Was wurde warum geändert?
+
+Hier ist die Erklärung der Architekturänderungen im Vergleich zum letzten Commit (PR), damit du
+verstehst, wie das neue relationale Modell arbeitet:
+
+### 1. Warum wurden die Collections aus `LessonEntity` entfernt?
+
+- **Das Problem zuvor**: `rooms`, `teacher` und `groupsCode` waren als Kollektionen direkt in der
+  Klasse `LessonEntity` deklariert und wurden über einen `TypeConverter` als JSON-Strings in eine
+  einzelne Tabellenspalte geschrieben.
+- **Die Lösung**: Das widerspricht der 1. Normalform von relationalen Datenbanken. Wir haben diese
+  Kollektionen in drei eigenständige Junction-Tabellen ausgelagert (`lesson_rooms`,
+  `lesson_teachers` und `lesson_groups`).
+- **Der Vorteil**: Wir benötigen keinen fehleranfälligen JSON-TypeConverter mehr. Zudem können wir
+  nun performante SQL-Abfragen über Fremdschlüssel (`ForeignKey`) ausführen. Die Beziehungen sind
+  mit `onDelete = ForeignKey.CASCADE` abgesichert. Das bedeutet: Löschen wir eine Vorlesung, löscht
+  SQLite automatisch alle zugehörigen Raum-, Dozenten- und Studiengangsbeziehungen aus den
+  Zwischentabellen.
+
+### 2. Warum liegen die Filterregeln nun in Room statt im Preferences DataStore?
+
+- **Das Problem zuvor**: Die benutzerdefinierten Auswahlen (`extraLessons` und `hiddenLessons`)
+  wurden als serialisierte JSON-Strings im Preferences DataStore abgelegt. Wollten wir den
+  Stundenplan anzeigen, mussten wir alle globalen Vorlesungen aus Room laden, die JSON-Regeln im RAM
+  parsen und in Kotlin-Code filtern (Laufzeitkomplexität O(N*M)). Zudem gab es keine referenzielle
+  Integrität: Änderten sich die IDs der Vorlesungen in Room, zeigten die IDs im DataStore auf tote
+  Einträge.
+- **Die Lösung**: Die Regeln wurden in die SQLite-Tabellen `extra_lessons` und `hidden_lessons`
+  überführt. Einzeltermin-Regeln referenzieren nun direkt per `ForeignKey` die stabile ID der
+  Tabelle `lessons`.
+- **Der Vorteil**: Wir haben echte referenzielle Integrität. Wenn eine Vorlesung komplett
+  abgesagt/gelöscht wird, sorgt `onDelete = ForeignKey.CASCADE` dafür, dass SQLite die verknüpfte
+  Filterregel automatisch mit wegräumt. Außerdem wird die Filterung über die DAO-Abfrage
+  `observeUserLessons` direkt per SQL (JOINs und EXISTS-Klauseln) in der Datenbank-Engine
+  durchgeführt. Das ist um ein Vielfaches schneller und schont die Systemressourcen des Smartphones.
+
+### 3. Warum wurde die ID-Generierung in `LessonParser` geändert?
+
+- **Das Problem zuvor**: Die ID wurde als Hash ausnahmslos aller Attribute erzeugt – inklusive Räume
+  und Dozenten. Änderte sich beispielsweise bei einer Vorlesung der Raum, änderte sich deren ID. Die
+  Folge: Die Fremdschlüsselverbindung in `extra_lessons` oder `hidden_lessons` wurde kaskadierend
+  gelöscht, und die Vorlesung verschwand ungewollt aus dem gefilterten Nutzerstundenplan.
+- **Die Lösung**: Die ID wird jetzt primär über die von der API bereitgestellte `lessonRef`
+  kombiniert mit dem Datum erzeugt (`lessonRef#date`). Für Zusatzstunden ohne `lessonRef` gibt es
+  einen Fallback-Hash, der flüchtige Felder wie Dozenten oder Räume bewusst ausschließt.
+- **Der Vorteil**: Die ID bleibt auch bei Raum- oder Dozentenwechseln absolut stabil. Die
+  Verknüpfungen des Nutzers brechen bei Stundenplanaktualisierungen nicht mehr ab.

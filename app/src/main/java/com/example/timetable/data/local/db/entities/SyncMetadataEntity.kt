@@ -1,4 +1,4 @@
-package com.example.timetable.utils.data.local
+package com.example.timetable.data.local.db.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

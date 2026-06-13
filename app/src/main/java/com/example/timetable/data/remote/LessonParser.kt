@@ -1,7 +1,7 @@
-package com.example.timetable.utils.data.services
+package com.example.timetable.data.remote
 
-import com.example.timetable.utils.data.datenmodell.Event
-import com.example.timetable.utils.data.datenmodell.Lesson
+import com.example.timetable.data.model.Event
+import com.example.timetable.data.model.Lesson
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
@@ -20,7 +20,7 @@ class LessonParser {
         val lessons = mutableListOf<Lesson>()
         for (i in 0 until array.length()) {
             val lessonObject = array.optJSONObject(i) ?: continue
-            lessons += parseLesson(lessonObject)
+            lessons.addAll(parseLesson(lessonObject))
         }
         return lessons
     }
@@ -36,6 +36,7 @@ class LessonParser {
         val dates = readStringList(obj, "dates").map(::formatDate)
         if (dates.isEmpty()) return emptySet()
 
+        val lessonRef = obj.optString("lessonRef").takeIf { it.isNotBlank() }
         val startTime = formatTime(obj.optString("startTime"))
         val endTime = formatTime(obj.optString("endTime"))
         val rooms = readStringSet(obj, "roomCodes")
@@ -46,16 +47,20 @@ class LessonParser {
 
         val lessons = linkedSetOf<Lesson>()
         for (date in dates) {
-            val lessonId = buildLessonId(
-                title = title,
-                date = date,
-                startTime = startTime,
-                endTime = endTime,
-                rooms = rooms,
-                building = building,
-                teachers = teachers,
-                groupsCode = groupsCode
-            )
+            // falls lessonRef (s. test.json) vorhanden ist, nutzen wir den Wert als ID
+            val lessonId = if (lessonRef != null) {
+                "$lessonRef#$date"
+            } else {
+                buildFallbackLessonId(
+                    title = title,
+                    date = date,
+                    startTime = startTime,
+                    endTime = endTime,
+                    groupsCode = groupsCode,
+                    rooms = rooms,
+                    teachers = teachers
+                )
+            }
             lessons.add(
                 Lesson(
                     id = lessonId,
@@ -74,27 +79,33 @@ class LessonParser {
         return lessons
     }
 
-    private fun buildLessonId(
+    /**
+     * Erzeugt eine Fallback-ID für eine Vorlesungsstunde, falls keine lessonRef in der API existiert.
+     *
+     * Hinweis:
+     * Flüchtige Felder wie rooms oder teachers werden hier absichtlich nicht mitgehasht, damit die ID bei erwartbaren Raum- oder Dozentenänderungen stabil bleibt.
+     */
+    private fun buildFallbackLessonId(
         title: String,
         date: String,
         startTime: String,
         endTime: String,
+        groupsCode: Set<String>,
         rooms: Set<String>,
-        building: String?,
-        teachers: Set<String>,
-        groupsCode: Set<String>
+        teachers: Set<String>
     ): String {
+        // nur stabile identifikatoren verketten
         val rawKey = listOf(
             title,
             date,
             startTime,
             endTime,
-            building.orEmpty(),
+            groupsCode.sorted().joinToString("|"),
             rooms.sorted().joinToString("|"),
-            teachers.sorted().joinToString("|"),
-            groupsCode.sorted().joinToString("|")
+            teachers.sorted().joinToString("|")
         ).joinToString("#")
 
+        // hash generieren
         return MessageDigest.getInstance("SHA-256")
             .digest(rawKey.toByteArray())
             .joinToString("") { byte -> "%02x".format(byte) }

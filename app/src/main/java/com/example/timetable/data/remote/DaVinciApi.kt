@@ -1,6 +1,6 @@
-package com.example.timetable.utils.data.services
+package com.example.timetable.data.remote
 
-import com.example.timetable.utils.data.datenmodell.DaVinciResponse
+import com.example.timetable.data.model.DaVinciResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject

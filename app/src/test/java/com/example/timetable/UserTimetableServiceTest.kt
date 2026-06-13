@@ -4,11 +4,12 @@ import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.example.timetable.utils.data.TimetableRepository
-import com.example.timetable.utils.data.UserSchedulePreferencesStore
-import com.example.timetable.utils.data.local.TimetableDatabase
-import com.example.timetable.utils.data.services.DaVinciApi
-import com.example.timetable.utils.data.services.UserTimetableService
+import com.example.timetable.data.repository.TimetableRepository
+import com.example.timetable.data.local.preferences.UserSchedulePreferencesStore
+import com.example.timetable.data.local.db.TimetableDatabase
+import com.example.timetable.data.remote.DaVinciApi
+import com.example.timetable.data.services.UserTimetableService
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -32,7 +33,7 @@ class UserTimetableServiceTest {
         repository.initialize()
 
         val preferencesStore = createPreferencesStore(tempDir)
-        val userService = UserTimetableService(repository, preferencesStore)
+        val userService = UserTimetableService(repository, preferencesStore, database)
         val matheLessons = repository.getLessonsByTitleAndGroupsCode("Mathe", "mb-MBB_4").sortedBy { it.date }
         val informatikLesson = repository.getLessonsByTitleAndGroupsCode("Informatik", "eti-SKIB_4").first()
 
@@ -41,8 +42,8 @@ class UserTimetableServiceTest {
         userService.addExtraLessonById(informatikLesson.id)
         userService.hideLessonById(matheLessons.first().id)
 
-        val userLessons = userService.buildUserLessons()
-        val userDays = userService.buildUserCalenderDays()
+        val userLessons = userService.userLessonsFlow().first()
+        val userDays = userService.userCalenderDaysFlow().first()
         val preferences = userService.getPreferences()
 
         assertTrue(preferences.isSetupComplete)
@@ -67,15 +68,16 @@ class UserTimetableServiceTest {
         repository.initialize()
 
         val preferencesStore = createPreferencesStore(tempDir)
-        val userService = UserTimetableService(repository, preferencesStore)
+        val userService = UserTimetableService(repository, preferencesStore, database)
         val informatikLesson = repository.getLessonsByTitleAndGroupsCode("Informatik", "eti-SKIB_4").first()
 
+        userService.setGroupsCode("mb-MBB_4") // Need a groupsCode to trigger the flow
         userService.addExtraLessonById(informatikLesson.id)
         userService.hideLessonById(informatikLesson.id)
 
-        val userLessons = userService.buildUserLessons()
+        val userLessons = userService.userLessonsFlow().first()
 
-        assertTrue(userLessons.isEmpty())
+        assertTrue(userLessons.isEmpty() || userLessons.none { it.id == informatikLesson.id })
 
         database.close()
     }

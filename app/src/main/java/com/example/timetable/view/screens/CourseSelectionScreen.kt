@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.timetable.view.components.selection.CompactGlassCard
@@ -47,6 +48,9 @@ fun CourseSelectionScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedResult by remember { mutableStateOf<JsonLesson?>(null) }
+
+    // for hiding the keyboard on selection
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     // perform schedule collision check against active module database
     val userLessons = remember(MockLogic.selectedModuleTitles.size) {
@@ -169,8 +173,12 @@ fun CourseSelectionScreen(
                                         conflictInfo = conflict,
                                         isSelected = selectedResult?.title == lesson.title,
                                         onClick = {
-                                            selectedResult =
-                                                if (selectedResult?.title == lesson.title) null else lesson
+                                            if (selectedResult?.title == lesson.title) {
+                                                selectedResult = null
+                                            } else {
+                                                keyboardController?.hide()
+                                                selectedResult = lesson
+                                            }
                                         }
                                     )
                                 }

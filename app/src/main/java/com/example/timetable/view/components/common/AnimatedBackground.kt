@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
@@ -27,10 +29,28 @@ import kotlin.math.sin
  */
 @Composable
 fun AnimatedBackground(
+    route: String? = null,
     accentColor: Color? = null
 ) {
     // set up infinite transition for horizontal wave movement
     val infiniteTransition = rememberInfiniteTransition(label = "WaveTime")
+
+    // for screen change effect
+    val speedMultiplier = remember { Animatable(1f) }
+
+    // accelerate wave movement on route (screen) change
+    LaunchedEffect(route) {
+        if (route != null) {
+            speedMultiplier.animateTo(
+                targetValue = 4.0f,
+                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+            )
+            speedMultiplier.animateTo(
+                targetValue = 1.0f,
+                animationSpec = tween(durationMillis = 1800, easing = LinearOutSlowInEasing)
+            )
+        }
+    }
 
     // animate the phase angle from 0 to 2*pi endlessly
     val time by infiniteTransition.animateFloat(
@@ -71,31 +91,31 @@ fun AnimatedBackground(
             // using integer speed factors guarantees seamless loops at time boundary
             val waveConfigs = listOf(
                 WaveConfig(
-                    baselineFraction = 0.65f,
+                    baselineFraction = 0.4f,
                     amplitude = 45f,
                     frequency = 0.005f,
                     speedFactor = 1,
                     harmonicSpeedFactor = -1,
-                    colorStart = animatedBaseColor.copy(alpha = 0.12f),
-                    colorEnd = animatedBaseColor.copy(alpha = 0.02f)
-                ),
-                WaveConfig(
-                    baselineFraction = 0.70f,
-                    amplitude = 30f,
-                    frequency = 0.008f,
-                    speedFactor = -1, // moves in reverse direction
-                    harmonicSpeedFactor = 2,
-                    colorStart = animatedBaseColor.copy(alpha = 0.08f),
+                    colorStart = animatedBaseColor.copy(alpha = 0.15f),
                     colorEnd = animatedBaseColor.copy(alpha = 0.01f)
                 ),
                 WaveConfig(
+                    baselineFraction = 0.55f,
+                    amplitude = 40f,
+                    frequency = 0.008f,
+                    speedFactor = -1, // moves in reverse direction
+                    harmonicSpeedFactor = 2,
+                    colorStart = animatedBaseColor.copy(alpha = 0.2f),
+                    colorEnd = animatedBaseColor.copy(alpha = 0.1f)
+                ),
+                WaveConfig(
                     baselineFraction = 0.75f,
-                    amplitude = 20f,
+                    amplitude = 35f,
                     frequency = 0.003f,
                     speedFactor = 2,
                     harmonicSpeedFactor = -1,
-                    colorStart = animatedBaseColor.copy(alpha = 0.15f),
-                    colorEnd = animatedBaseColor.copy(alpha = 0.03f)
+                    colorStart = animatedBaseColor.copy(alpha = 0.25f),
+                    colorEnd = animatedBaseColor.copy(alpha = 0.1f)
                 )
             )
 
@@ -111,9 +131,10 @@ fun AnimatedBackground(
                         val baseline = height * config.baselineFraction
 
                         // sum of two sine waves at integer speed multipliers avoids phase jump at loop reset
-                        val angle1 = (x * config.frequency) + (time * config.speedFactor)
+                        val angle1 =
+                            (x * config.frequency) + (time * config.speedFactor * speedMultiplier.value)
                         val angle2 =
-                            (x * config.frequency * 1.8f) - (time * config.harmonicSpeedFactor)
+                            (x * config.frequency * 1.8f) - (time * config.harmonicSpeedFactor * speedMultiplier.value)
 
                         val y = baseline +
                                 (config.amplitude * sin(angle1)) +

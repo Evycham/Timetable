@@ -1,6 +1,7 @@
 package com.example.timetable.view.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -22,6 +23,7 @@ sealed class Screen(val route: String) {
     object Timetable : Screen("timetable/{course}") {
         fun createRoute(course: String) = "timetable/$course"
     }
+
     object CourseSelection : Screen("course_selection")
     object Settings : Screen("settings")
 }
@@ -31,10 +33,10 @@ sealed class Screen(val route: String) {
  * zwischen den verschiedenen Ansichten (Home, Setup, Stundenplan, Kursauswahl, Einstellungen) verwaltet.
  */
 @Composable
-fun TimetableNavHost() {
+fun TimetableNavHost(
+    navController: NavHostController = rememberNavController()
+) {
     // TODO [viewmodel]: Inject NavigationViewModel here to determine startDestination (Setup vs. Timetable)
-    // navigation controller manages backstack and screen transitions
-    val navController = rememberNavController()
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route // TODO [viewmodel]: Use ViewModel state for dynamic startDestination

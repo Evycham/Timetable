@@ -1,8 +1,8 @@
 package com.example.timetable.data.services
 
-import com.example.timetable.data.datenmodell.CalenderDay
-import com.example.timetable.data.datenmodell.Event
-import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.data.model.CalenderDay
+import com.example.timetable.data.model.Event
+import com.example.timetable.data.model.Lesson
 import java.time.LocalDate
 
 object CalenderDayMapper {
@@ -42,7 +42,7 @@ object CalenderDayMapper {
         for (event in events) {
             val dates = expandEventDates(event)
             for (date in dates) {
-                eventsByDate.getOrPut(date) { mutableListOf() }.add(event)
+                eventsByDate.getOrPut(date) { mutableListOf<Event>() }.add(event)
             }
         }
 

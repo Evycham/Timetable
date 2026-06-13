@@ -3,7 +3,7 @@ package com.example.timetable.components
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import com.example.timetable.data.datenmodell.Event
+import com.example.timetable.data.model.Event
 import com.example.timetable.view.components.timetable.TimeTableEventItem
 import com.example.timetable.view.theme.TimeTableTheme
 import org.junit.Rule

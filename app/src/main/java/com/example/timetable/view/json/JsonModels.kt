@@ -1,6 +1,6 @@
 package com.example.timetable.view.json
 
-import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.data.model.Lesson
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.DayOfWeek
@@ -46,9 +46,9 @@ data class JsonLesson(
             teacher = setOf(lecturer),
             groupsCode = course.split(",").map { it.trim() }.toSet(),
             change = change?.let {
-                val isCancellation = it.caption.contains("aus", ignoreCase = true) || 
-                                     it.message.contains("aus", ignoreCase = true) ||
-                                     it.caption.contains("cancell", ignoreCase = true)
+                val isCancellation = it.caption.contains("aus", ignoreCase = true) ||
+                        it.message.contains("aus", ignoreCase = true) ||
+                        it.caption.contains("cancell", ignoreCase = true)
                 Lesson.Change(
                     caption = it.caption,
                     reasonType = if (isCancellation) "cancellation" else "roomChange",

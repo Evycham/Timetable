@@ -3,7 +3,8 @@
 ## Ziel dieses Dokuments
 
 Dieses Dokument beschreibt die aktuelle Datenarchitektur der App.
-Es ist für Entwickler gedacht, die später UI, ViewModel, Worker oder weitere Features mit dem Datenlayer verbinden.
+Es ist für Entwickler gedacht, die später UI, ViewModel, Worker oder weitere Features mit dem
+Datenlayer verbinden.
 
 Der Fokus liegt auf diesen Fragen:
 
@@ -26,13 +27,15 @@ Der aktuelle Datenfluss ist bewusst getrennt:
 
 3. `TimetableRepository`
    Ist die zentrale Datenquelle für alle globalen Stundenplandaten.
-   Diese Klasse lädt aus Room, aktualisiert bei Bedarf aus dem Netz und stellt Listen, Flows und Sync-Status bereit.
+   Diese Klasse lädt aus Room, aktualisiert bei Bedarf aus dem Netz und stellt Listen, Flows und
+   Sync-Status bereit.
 
 4. `UserSchedulePreferencesStore`
    Speichert user-spezifische Regeln in DataStore.
 
 5. `UserTimetableService`
-   Kombiniert globale Repository-Daten mit den User-Preferences und baut daraus den persönlichen Stundenplan.
+   Kombiniert globale Repository-Daten mit den User-Preferences und baut daraus den persönlichen
+   Stundenplan.
 
 6. `CalenderDayMapper`
    Baut aus `Lesson` und `Event` eine kalenderfreundliche Liste von `CalenderDay`.
@@ -68,8 +71,10 @@ Er wird immer aus globalen Daten plus User-Regeln berechnet.
 
 Datei: `app/src/main/java/com/example/timetable/data/datenmodell/Lessons.kt`
 
-`Lesson` repräsentiert eine konkrete Lehrveranstaltung wie Vorlesung, Übung oder Labor mit einer festen Uhrzeit an einem bestimmten Datum.
-Eine `Lesson` findet in einem bestimmten Raum mit Dozenten statt und ist einem oder mehreren `groupsCode`s zugeordnet.
+`Lesson` repräsentiert eine konkrete Lehrveranstaltung wie Vorlesung, Übung oder Labor mit einer
+festen Uhrzeit an einem bestimmten Datum.
+Eine `Lesson` findet in einem bestimmten Raum mit Dozenten statt und ist einem oder mehreren
+`groupsCode`s zugeordnet.
 
 Wichtige Felder:
 
@@ -91,17 +96,22 @@ Damit kann eine konkrete einzelne Lesson über App-Starts hinweg wiedergefunden 
 
 Aktuelle Einschränkung:
 
-Wenn sich für eine Lesson relevante Inhalte wie Raum oder Dozent ändern, ändert sich auch die generierte `id`.
-Dadurch können gespeicherte User-Regeln, die exakt auf diese `lessonId` zeigen, nach einem Update nicht mehr greifen.
+Wenn sich für eine Lesson relevante Inhalte wie Raum oder Dozent ändern, ändert sich auch die
+generierte `id`.
+Dadurch können gespeicherte User-Regeln, die exakt auf diese `lessonId` zeigen, nach einem Update
+nicht mehr greifen.
 Dieser Punkt ist bekannt und aktuell akzeptiert.
-Wenn das später fachlich problematisch wird, muss die User-Regel-Speicherung enger an die Datenbank gekoppelt werden.
+Wenn das später fachlich problematisch wird, muss die User-Regel-Speicherung enger an die Datenbank
+gekoppelt werden.
 
 ### `Event`
 
 Datei: `app/src/main/java/com/example/timetable/data/datenmodell/Events.kt`
 
-`Event` repräsentiert globale Termine wie Ferien, Feiertage oder Prüfungsphasen, die für die gesamte Hochschule gelten.
-Ein `Event` hat ein Start- und Enddatum, aber keine feste Uhrzeit, keinen Raum und keinen Studiengruppenbezug.
+`Event` repräsentiert globale Termine wie Ferien, Feiertage oder Prüfungsphasen, die für die gesamte
+Hochschule gelten.
+Ein `Event` hat ein Start- und Enddatum, aber keine feste Uhrzeit, keinen Raum und keinen
+Studiengruppenbezug.
 
 Wichtige Felder:
 
@@ -116,7 +126,8 @@ Die Verteilung auf einzelne Kalendertage macht später `CalenderDayMapper`.
 
 ### `groupsCode`
 
-Ein `groupsCode` wie `eti-SKIB 4` oder `mb-SPB_4` repräsentiert typischerweise ein Semester eines Studiengangs.
+Ein `groupsCode` wie `eti-SKIB 4` oder `mb-SPB_4` repräsentiert typischerweise ein Semester eines
+Studiengangs.
 
 Beispiel `eti-SKIB 4`:
 
@@ -125,7 +136,8 @@ Beispiel `eti-SKIB 4`:
 - Semester: 4
 
 Im Setup-Prozess wählt der Nutzer seinen primären `groupsCode`.
-Da Vorlesungen häufig von mehreren Studiengängen geteilt werden, besitzt jede `Lesson` ein Set von `groupsCode`s.
+Da Vorlesungen häufig von mehreren Studiengängen geteilt werden, besitzt jede `Lesson` ein Set von
+`groupsCode`s.
 
 ### `CalenderDay`
 
@@ -139,7 +151,8 @@ Felder:
 - `lessons`
 - `events`
 
-Bei regulärer Nutzung einer Tages- oder Wochenansicht sollte die UI mit `List<CalenderDay>` arbeiten.
+Bei regulärer Nutzung einer Tages- oder Wochenansicht sollte die UI mit `List<CalenderDay>`
+arbeiten.
 
 Typische Fälle für die direkte Nutzung von `Lesson` oder `Event` statt `CalenderDay` sind:
 
@@ -150,7 +163,8 @@ Typische Fälle für die direkte Nutzung von `Lesson` oder `Event` statt `Calend
 
 ### `extraLessons`
 
-`extraLessons` sind `Lesson`s, die der Nutzer zusätzlich in seinem Plan anzeigen möchte, obwohl sie nicht zu seinem primären `groupsCode` gehören.
+`extraLessons` sind `Lesson`s, die der Nutzer zusätzlich in seinem Plan anzeigen möchte, obwohl sie
+nicht zu seinem primären `groupsCode` gehören.
 
 Technisch werden diese nicht als komplette `Lesson` gespeichert, sondern als `LessonSelection`.
 
@@ -173,8 +187,11 @@ Felder:
 
 Zusätzliche Modelle:
 
-- `LessonSelection`
-- `HiddenLessonRule`
+- `LessonSelection` - Ermöglicht die Auswahl einzelner Termine (über `lessonId`) oder ganzer Kurse /
+  Module (über `title` und `groupsCode`).
+- `HiddenLessonRule` - Definiert Ausblendungsregeln. Unterstützt das Ausblenden einzelner Termine (
+  über `lessonId`), ganzer Kurse / Module (über `title`) oder ganzer Studiengänge (über
+  `groupsCode`).
 
 Diese Typen beschreiben keine kompletten Stundenplandaten, sondern nur User-Regeln.
 Das hält Preferences klein und unabhängig von der globalen Datenmenge.
@@ -237,8 +254,10 @@ Kalenderlogik gehört nicht in den Parser.
 
 Außerdem gilt:
 
-Wenn ein Feld wie `roomCodes` oder `classCodes` in der API nicht als JSON-Array geliefert wird, bricht der Parser bewusst mit einer Exception ab.
-Das ist absichtlich so, damit kaputte Serverdaten nicht still downstream zu schwer auffindbaren Fehlern führen.
+Wenn ein Feld wie `roomCodes` oder `classCodes` in der API nicht als JSON-Array geliefert wird,
+bricht der Parser bewusst mit einer Exception ab.
+Das ist absichtlich so, damit kaputte Serverdaten nicht still downstream zu schwer auffindbaren
+Fehlern führen.
 
 ## `CalenderDayMapper`
 
@@ -301,7 +320,8 @@ Mögliche Zustände:
 - `Ready`
 - `Error`
 
-Das UI oder ViewModel sollte diesen State beobachten, um differenziert auf folgende Fälle reagieren zu können:
+Das UI oder ViewModel sollte diesen State beobachten, um differenziert auf folgende Fälle reagieren
+zu können:
 
 - lokale Daten werden geladen
 - Netzsync läuft
@@ -338,7 +358,8 @@ Verhalten:
 
 Hinweis:
 
-Die ältere Methode `loadFromCache()` existiert nur noch als abwärtskompatibler Alias und sollte nicht mehr neu verwendet werden.
+Die ältere Methode `loadFromCache()` existiert nur noch als abwärtskompatibler Alias und sollte
+nicht mehr neu verwendet werden.
 
 #### `reloadJson()`
 
@@ -369,7 +390,8 @@ Verhalten:
 - vergleicht `jsonHash` mit gespeicherten Metadaten
 - ersetzt Room nur, wenn sich die Daten wirklich geändert haben
 - bei Offline-Fehler und vorhandenen lokalen Daten bleibt der letzte lokale Stand erhalten
-- bei Offline-Fehler ohne lokale Daten wird die Exception weitergegeben und zusätzlich `syncState = Error` gesetzt
+- bei Offline-Fehler ohne lokale Daten wird die Exception weitergegeben und zusätzlich
+  `syncState = Error` gesetzt
 
 Rückgabe:
 
@@ -408,8 +430,10 @@ Der aktuelle Stand ist bewusst hybrid:
 - Room ist die persistente Quelle für globale Daten
 - die Repository-Getter spiegeln den zuletzt geladenen In-Memory-Zustand
 
-Das ist funktional in Ordnung, aber noch nicht die strengste mögliche Single-Source-of-Truth-Variante.
-Wenn später Notification- oder Worker-Logik umfangreicher wird, sollte geprüft werden, ob bestimmte Getter direkt DAO-basiert als `suspend`-Abfragen angeboten werden sollen.
+Das ist funktional in Ordnung, aber noch nicht die strengste mögliche
+Single-Source-of-Truth-Variante.
+Wenn später Notification- oder Worker-Logik umfangreicher wird, sollte geprüft werden, ob bestimmte
+Getter direkt DAO-basiert als `suspend`-Abfragen angeboten werden sollen.
 
 ## `UserSchedulePreferencesStore`
 
@@ -431,7 +455,8 @@ Wichtige API:
 
 Wichtig:
 
-Wenn der JSON-Inhalt von `extraLessons` oder `hiddenLessons` beschädigt ist, gibt der Store nicht-crashend leere Regeln zurück.
+Wenn der JSON-Inhalt von `extraLessons` oder `hiddenLessons` beschädigt ist, gibt der Store
+nicht-crashend leere Regeln zurück.
 Das verhindert, dass eine korrupte DataStore-Value sofort den gesamten Ladepfad blockiert.
 
 ## `UserTimetableService`
@@ -531,6 +556,17 @@ Wenn nur ein einzelner Termin betroffen sein soll, muss mit `lessonId` gearbeite
 6. Repository speichert alles in Room
 7. Repository baut `CalenderDay`
 8. UI kann Daten anzeigen
+
+### Erstes Laden der App ohne Internet
+
+1. ViewModel erzeugt `TimetableRepository`
+2. `initialize()` wird aufgerufen
+3. Repository prüft Room und stellt fest, dass Room leer ist
+4. Repository versucht, JSON über `reloadJson()` aus dem Netz zu laden
+5. Netzwerkaufruf schlägt fehl (keine Internetverbindung)
+6. `syncState` wechselt auf `RepositorySyncState.Error` mit `hasLocalDate = false`
+7. Exception wird weitergeworfen und muss vom aufrufenden Scope abgefangen werden
+8. UI zeigt einen blockierenden Fehlerbildschirm mit Retry-Option
 
 ### Späterer App-Start ohne Internet
 
@@ -840,7 +876,8 @@ Solange keine Umbenennung gewollt ist, muss im Rest des Codes aber der aktuelle 
 
 ## Bewusst nicht umgesetzt
 
-Einige Diskussionspunkte wurden nicht sofort in Code umgebaut, weil sie größere Architekturänderungen wären:
+Einige Diskussionspunkte wurden nicht sofort in Code umgebaut, weil sie größere
+Architekturänderungen wären:
 
 - komplette Verlagerung aller User-Regeln von DataStore nach Room
 - vollständiges Entfernen des Repository-In-Memory-Zustands zugunsten rein DAO-basierter Getter
@@ -870,11 +907,13 @@ Sinnvoll ist ein UI-State wie:
 
 ### 3. Sync-Metadaten für UI lesbar machen
 
-Wenn die UI später anzeigen soll, wann zuletzt synchronisiert wurde, kann das Repository noch eine Methode oder einen Flow für `SyncMetadataEntity` bekommen.
+Wenn die UI später anzeigen soll, wann zuletzt synchronisiert wurde, kann das Repository noch eine
+Methode oder einen Flow für `SyncMetadataEntity` bekommen.
 
 ### 4. User-Regeln fachlich schärfen
 
-Falls die `lessonId`-Instabilität bei Raum- oder Dozentenänderungen zu Problemen führt, muss entschieden werden, ob User-Regeln künftig relational in Room abgelegt werden sollen.
+Falls die `lessonId`-Instabilität bei Raum- oder Dozentenänderungen zu Problemen führt, muss
+entschieden werden, ob User-Regeln künftig relational in Room abgelegt werden sollen.
 
 ## Kurzfassung
 

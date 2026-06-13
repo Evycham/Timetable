@@ -40,7 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.utils.data.datenmodell.Lesson
 import com.example.timetable.view.json.MockLogic
 
 /**

@@ -38,7 +38,7 @@ class DaVinciApi(
             DaVinciDownloadSnapshot(
                 rawJson = jsonString,
                 response = parseResponse(jsonString),
-                jsonSize = jsonString.toByteArray(Charsets.UTF_8).size.toLong(),
+                jsonSize = jsonString.length.toLong(),
                 jsonHash = sha256(jsonString)
             )
         }

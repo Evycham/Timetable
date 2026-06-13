@@ -1,4 +1,4 @@
-package com.example.timetable.data.datenmodell
+package com.example.timetable.data.model
 
 import org.json.JSONArray
 

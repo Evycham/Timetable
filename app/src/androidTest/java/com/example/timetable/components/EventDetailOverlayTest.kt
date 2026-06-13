@@ -5,7 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.data.model.Lesson
 import com.example.timetable.view.components.timetable.EventDetailOverlay
 import com.example.timetable.view.theme.TimeTableTheme
 import org.junit.Assert.assertTrue

@@ -1,8 +1,8 @@
 package com.example.timetable
 
 import com.example.timetable.data.services.CalenderDayMapper
-import com.example.timetable.data.datenmodell.Event
-import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.data.model.Event
+import com.example.timetable.data.model.Lesson
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -57,5 +57,45 @@ class CalenderDayMapperTest {
 
         assertEquals(1, days[0].events.size)
         assertEquals(1, days[2].events.size)
+    }
+
+    @Test
+    fun build_withEmptyInputs_returnsEmptyList() {
+        val days = CalenderDayMapper.build(emptyList(), emptyList())
+        assertEquals(0, days.size)
+    }
+
+    @Test
+    fun build_withOnlyLessons_returnsDaysWithLessons() {
+        val lessons = listOf(
+            Lesson(id = "1", title = "L", date = "2026-05-18", startTime = "08:00", endTime = "09:30", groupsCode = setOf("A"))
+        )
+        val days = CalenderDayMapper.build(lessons, emptyList())
+        assertEquals(1, days.size)
+        assertEquals("2026-05-18", days[0].date)
+        assertEquals(1, days[0].lessons.size)
+        assertEquals(0, days[0].events.size)
+    }
+
+    @Test
+    fun build_withOnlyEvents_returnsDaysWithEvents() {
+        val events = listOf(
+            Event(id = "E", title = "T", startDate = "2026-05-18", endDate = "2026-05-18")
+        )
+        val days = CalenderDayMapper.build(emptyList(), events)
+        assertEquals(1, days.size)
+        assertEquals("2026-05-18", days[0].date)
+        assertEquals(0, days[0].lessons.size)
+        assertEquals(1, days[0].events.size)
+    }
+
+    @Test
+    fun build_handlesInvalidEventDates_gracefully() {
+        val events = listOf(
+            Event(id = "E", title = "T", startDate = "invalid", endDate = "invalid")
+        )
+        val days = CalenderDayMapper.build(emptyList(), events)
+        assertEquals(1, days.size)
+        assertEquals("invalid", days[0].date)
     }
 }

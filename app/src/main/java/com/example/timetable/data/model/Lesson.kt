@@ -1,4 +1,4 @@
-package com.example.timetable.data.datenmodell
+package com.example.timetable.data.model
 
 import java.util.UUID
 
@@ -8,11 +8,11 @@ data class Lesson(
     val date: String,
     val startTime: String,
     val endTime: String,
-    val rooms: Set<String>?,
-    val building: String?,
-    val teacher: Set<String>?,
+    val rooms: Set<String>? = null,
+    val building: String? = null,
+    val teacher: Set<String>? = null,
     val groupsCode: Set<String>,
-    val change: Change?
+    val change: Change? = null
 ) {
     data class Change(
         val caption: String?,

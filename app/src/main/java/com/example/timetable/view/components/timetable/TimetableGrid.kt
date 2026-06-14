@@ -121,7 +121,7 @@ fun TimetableGrid(
                                 .fillMaxWidth()
                                 .padding(start = 40.dp)
                                 .height(1.dp)
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
                                 .align(Alignment.TopStart)
                         )
 
@@ -143,7 +143,7 @@ fun TimetableGrid(
                                     .fillMaxWidth()
                                     .padding(start = 40.dp)
                                     .height(1.dp)
-                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
                                     .align(Alignment.BottomStart)
                             )
                         }
@@ -162,7 +162,7 @@ fun TimetableGrid(
                         modifier = Modifier
                             .fillMaxHeight()
                             .weight(1f)
-                            .border(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                            .border(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.03f))
                     )
                 }
             }
@@ -327,7 +327,9 @@ fun LessonGridItem(
                         imageVector = icon,
                         contentDescription = null,
                         tint = facultyColor,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp)
                     )
                 }
 
@@ -336,6 +338,8 @@ fun LessonGridItem(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
+                    // use only user-defined icons as identification in weekview
+                    /*
                     Text(
                         text = displayTitle,
                         style = MaterialTheme.typography.labelSmall.copy(
@@ -346,17 +350,20 @@ fun LessonGridItem(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+                     */
 
                     Text(
                         text = lesson.room.substringBefore(" ("),
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 10.sp,
-                            lineHeight = 11.sp
+                            fontSize = 14.sp,
+                            lineHeight = 16.sp
                         ),
+                        textAlign = TextAlign.Center,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }

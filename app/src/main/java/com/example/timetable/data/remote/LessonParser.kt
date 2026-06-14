@@ -1,10 +1,10 @@
-package com.example.timetable.data.services
+package com.example.timetable.data.remote
 
-import com.example.timetable.data.datenmodell.Event
-import com.example.timetable.data.datenmodell.Lesson
+import com.example.timetable.data.model.Event
+import com.example.timetable.data.model.Lesson
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.UUID
+import java.security.MessageDigest
 
 class LessonParser {
 
@@ -20,7 +20,7 @@ class LessonParser {
         val lessons = mutableListOf<Lesson>()
         for (i in 0 until array.length()) {
             val lessonObject = array.optJSONObject(i) ?: continue
-            lessons += parseLesson(lessonObject)
+            lessons.addAll(parseLesson(lessonObject))
         }
         return lessons
     }
@@ -33,22 +33,37 @@ class LessonParser {
      */
     fun parseLesson(obj: JSONObject): Set<Lesson> {
         val title = obj.optString("courseTitle").takeIf { it.isNotBlank() } ?: return emptySet()
-        val dates = jsonArrayToList(obj.optJSONArray("dates")).map(::formatDate)
+        val dates = readStringList(obj, "dates").map(::formatDate)
         if (dates.isEmpty()) return emptySet()
 
+        val lessonRef = obj.optString("lessonRef").takeIf { it.isNotBlank() }
         val startTime = formatTime(obj.optString("startTime"))
         val endTime = formatTime(obj.optString("endTime"))
-        val rooms = jsonArrayToSet(obj.optJSONArray("roomCodes"))
-        val teachers = jsonArrayToSet(obj.optJSONArray("teacherCodes"))
-        val groupsCode = jsonArrayToSet(obj.optJSONArray("classCodes"))
-        val building = jsonArrayToList(obj.optJSONArray("buildingCodes")).firstOrNull()
+        val rooms = readStringSet(obj, "roomCodes")
+        val teachers = readStringSet(obj, "teacherCodes")
+        val groupsCode = readStringSet(obj, "classCodes")
+        val building = readStringList(obj, "buildingCodes").firstOrNull()
         val change = parseChange(obj)
 
         val lessons = linkedSetOf<Lesson>()
         for (date in dates) {
+            // falls lessonRef (s. test.json) vorhanden ist, nutzen wir den Wert als ID
+            val lessonId = if (lessonRef != null) {
+                "$lessonRef#$date"
+            } else {
+                buildFallbackLessonId(
+                    title = title,
+                    date = date,
+                    startTime = startTime,
+                    endTime = endTime,
+                    groupsCode = groupsCode,
+                    rooms = rooms,
+                    teachers = teachers
+                )
+            }
             lessons.add(
                 Lesson(
-                    id = UUID.randomUUID().toString(),
+                    id = lessonId,
                     title = title,
                     date = date,
                     startTime = startTime,
@@ -62,6 +77,38 @@ class LessonParser {
             )
         }
         return lessons
+    }
+
+    /**
+     * Erzeugt eine Fallback-ID für eine Vorlesungsstunde, falls keine lessonRef in der API existiert.
+     *
+     * Hinweis:
+     * Flüchtige Felder wie rooms oder teachers werden hier absichtlich nicht mitgehasht, damit die ID bei erwartbaren Raum- oder Dozentenänderungen stabil bleibt.
+     */
+    private fun buildFallbackLessonId(
+        title: String,
+        date: String,
+        startTime: String,
+        endTime: String,
+        groupsCode: Set<String>,
+        rooms: Set<String>,
+        teachers: Set<String>
+    ): String {
+        // nur stabile identifikatoren verketten
+        val rawKey = listOf(
+            title,
+            date,
+            startTime,
+            endTime,
+            groupsCode.sorted().joinToString("|"),
+            rooms.sorted().joinToString("|"),
+            teachers.sorted().joinToString("|")
+        ).joinToString("#")
+
+        // hash generieren
+        return MessageDigest.getInstance("SHA-256")
+            .digest(rawKey.toByteArray())
+            .joinToString("") { byte -> "%02x".format(byte) }
     }
 
     /**
@@ -129,22 +176,28 @@ class LessonParser {
     }
 
     /**
-     * Wandelt ein JSON-Array in ein Set von nicht-leeren Strings um.
+     * Liest ein String-Array-Feld aus einem JSON-Objekt als Set.
      *
-     * @param array Das zu lesende JSON-Array.
+     * @param obj Das JSON-Objekt mit dem Feld.
+     * @param key Der Feldname.
      * @return Ein Set mit allen nicht-leeren Einträgen.
      */
-    private fun jsonArrayToSet(array: JSONArray?): Set<String> =
-        jsonArrayToList(array).toSet()
+    private fun readStringSet(obj: JSONObject, key: String): Set<String> =
+        readStringList(obj, key).toSet()
 
     /**
-     * Wandelt ein JSON-Array in eine Liste von nicht-leeren Strings um.
+     * Liest ein String-Array-Feld aus einem JSON-Objekt als Liste.
+     * Wenn das Feld vorhanden ist, aber kein JSONArray enthält, wird fail-fast abgebrochen.
      *
-     * @param array Das zu lesende JSON-Array.
+     * @param obj Das JSON-Objekt mit dem Feld.
+     * @param key Der Feldname.
      * @return Eine Liste mit allen nicht-leeren Einträgen.
      */
-    private fun jsonArrayToList(array: JSONArray?): List<String> {
-        if (array == null) return emptyList()
+    private fun readStringList(obj: JSONObject, key: String): List<String> {
+        if (!obj.has(key) || obj.isNull(key)) return emptyList()
+
+        val array = obj.optJSONArray(key)
+            ?: failFast("Expected JSONArray for '$key' but found different type in lesson payload: $obj")
 
         val result = mutableListOf<String>()
         for (i in 0 until array.length()) {
@@ -154,6 +207,11 @@ class LessonParser {
             }
         }
         return result
+    }
+
+    private fun failFast(message: String): Nothing {
+        System.err.println("LessonParser error: $message")
+        throw IllegalStateException(message)
     }
 
     /**

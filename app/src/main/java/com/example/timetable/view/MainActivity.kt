@@ -18,11 +18,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.example.timetable.view.components.common.AnimatedBackground
 import com.example.timetable.view.navigation.TimetableNavHost
 import com.example.timetable.view.theme.TimeTableTheme
@@ -35,13 +38,21 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TimeTableTheme {
+                // create navcontroller
+                val navController = rememberNavController()
+                // watch current nav-entry and route for wave animation onChange
+                val currentBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = currentBackStackEntry?.destination?.route
+
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        AnimatedBackground()
-                        TimetableNavHost()
+                        // route as key for animation on sceen change
+                        AnimatedBackground(route = currentRoute)
+                        // navController gets navhost
+                        TimetableNavHost(navController = navController)
                     }
                 }
             }

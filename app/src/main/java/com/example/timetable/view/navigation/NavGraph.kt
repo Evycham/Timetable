@@ -1,8 +1,7 @@
 package com.example.timetable.view.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -13,7 +12,6 @@ import com.example.timetable.view.screens.CourseSelectionScreen
 import com.example.timetable.view.screens.InitialSetupScreen
 import com.example.timetable.view.screens.SettingsScreen
 import com.example.timetable.view.screens.TimetableScreen
-import com.example.timetable.viewmodel.SetupViewModel
 
 /**
  * Repräsentiert die verschiedenen Navigationsziele (Bildschirme) innerhalb der Anwendung.
@@ -25,6 +23,7 @@ sealed class Screen(val route: String) {
     object Timetable : Screen("timetable/{course}") {
         fun createRoute(course: String) = "timetable/$course"
     }
+
     object CourseSelection : Screen("course_selection")
     object Settings : Screen("settings")
 }
@@ -34,10 +33,10 @@ sealed class Screen(val route: String) {
  * zwischen den verschiedenen Ansichten (Home, Setup, Stundenplan, Kursauswahl, Einstellungen) verwaltet.
  */
 @Composable
-fun TimetableNavHost() {
+fun TimetableNavHost(
+    navController: NavHostController = rememberNavController()
+) {
     // TODO [viewmodel]: Inject NavigationViewModel here to determine startDestination (Setup vs. Timetable)
-    // navigation controller manages backstack and screen transitions
-    val navController = rememberNavController()
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route // TODO [viewmodel]: Use ViewModel state for dynamic startDestination
@@ -46,13 +45,9 @@ fun TimetableNavHost() {
             NavScreen(navController = navController)
         }
         composable(Screen.InitialSetup.route) {
-            val context = LocalContext.current
-            val setupViewModel: SetupViewModel = viewModel(
-                factory = SetupViewModel.factory(context)
-            )
+            // TODO [viewmodel]: Provide SetupViewModel to InitialSetupScreen
             // setup screen configuration callback
             InitialSetupScreen(
-                setupViewModel = setupViewModel,
                 onNavigateToTimetable = { course ->
                     navController.navigate(Screen.Timetable.createRoute(course)) {
                         // prevent double setup screens on backstack

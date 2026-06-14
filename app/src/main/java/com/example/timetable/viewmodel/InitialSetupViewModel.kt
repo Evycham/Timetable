@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-data class SetupUiState(
+data class InitialSetupUiState(
     val faculties: List<Faculty> = emptyList(),
     val selectedFaculty: Faculty? = null,
     val searchQuery: String = "",
@@ -17,13 +17,13 @@ data class SetupUiState(
     val isSetupComplete: Boolean = false
 )
 
-class SetupViewModel(
+class InitialSetupViewModel(
     private val repository: TimetableRepository,
     private val userService: UserTimetableService
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SetupUiState())
-    val uiState: StateFlow<SetupUiState> = _uiState
+    private val _uiState = MutableStateFlow(InitialSetupUiState())
+    val uiState: StateFlow<InitialSetupUiState> = _uiState
 
     init {
         loadFaculties()
@@ -53,10 +53,14 @@ class SetupViewModel(
 
     private fun loadFaculties() {
         viewModelScope.launch {
-            repository.initialize()
-            _uiState.value = _uiState.value.copy(
-                faculties = getFacultiesFromLessons()
-            )
+            try {
+                repository.initialize()
+                _uiState.value = _uiState.value.copy(
+                    faculties = getFacultiesFromLessons()
+                )
+            } catch (exception: Exception) {
+                _uiState.value = _uiState.value.copy(faculties = emptyList())
+            }
         }
     }
 

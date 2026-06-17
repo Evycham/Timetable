@@ -27,6 +27,7 @@ class InitialSetupViewModel(
 
     private val _uiState = MutableStateFlow(InitialSetupUiState())
     val uiState: StateFlow<InitialSetupUiState> = _uiState
+    private var allCoursesCache: List<String> = emptyList()
 
     init {
         loadFaculties()
@@ -44,9 +45,10 @@ class InitialSetupViewModel(
 
             try {
                 repository.initialize()
+                allCoursesCache = getCoursesFromLessons()
                 _uiState.update { current ->
                     current.copy(
-                        faculties = getFacultiesFromLessons(),
+                        faculties = getFacultiesFromCourses(),
                         isLoading = false
                     )
                 }
@@ -94,21 +96,22 @@ class InitialSetupViewModel(
         if (faculty == null) return emptyList()
 
         val facultyPrefix = faculty.prefix.removeSuffix("-")
-        return repository.getAllLessons()
-            .flatMap { lesson -> lesson.groupsCode }
-            .distinct()
+        return allCoursesCache
             .filter { course -> course.startsWith(facultyPrefix, ignoreCase = true) }
             .filter { course -> course.contains(query, ignoreCase = true) }
             .sorted()
     }
 
-    private fun getFacultiesFromLessons(): List<Faculty> {
-        val courses = repository.getAllLessons()
+    private fun getCoursesFromLessons(): List<String> {
+        return repository.getAllLessons()
             .flatMap { lesson -> lesson.groupsCode }
+            .distinct()
+    }
 
+    private fun getFacultiesFromCourses(): List<Faculty> {
         return Faculty.entries.filter { faculty ->
             val facultyPrefix = faculty.prefix.removeSuffix("-")
-            courses.any { course -> course.startsWith(facultyPrefix, ignoreCase = true) }
+            allCoursesCache.any { course -> course.startsWith(facultyPrefix, ignoreCase = true) }
         }
     }
 }

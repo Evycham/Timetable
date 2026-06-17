@@ -15,7 +15,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
-import com.example.timetable.data.services.LessonParser
+import com.example.timetable.data.remote.LessonParser
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray

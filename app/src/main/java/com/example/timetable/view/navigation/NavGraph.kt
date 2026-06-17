@@ -1,17 +1,32 @@
 package com.example.timetable.view.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
-import com.example.timetable.view.NavScreen
+import com.example.timetable.data.local.db.TimetableDatabase
+import com.example.timetable.data.local.preferences.UserSchedulePreferencesStore
+import com.example.timetable.data.local.preferences.userSchedulePreferencesDataStore
+import com.example.timetable.data.repository.TimetableRepository
+import com.example.timetable.data.services.UserTimetableService
 import com.example.timetable.view.screens.CourseSelectionScreen
 import com.example.timetable.view.screens.InitialSetupScreen
 import com.example.timetable.view.screens.SettingsScreen
 import com.example.timetable.view.screens.TimetableScreen
+import com.example.timetable.viewmodel.AppNavigationViewModel
+import com.example.timetable.viewmodel.ViewModelFactory
 
 /**
  * Repräsentiert die verschiedenen Navigationsziele (Bildschirme) innerhalb der Anwendung.
@@ -36,13 +51,42 @@ sealed class Screen(val route: String) {
 fun TimetableNavHost(
     navController: NavHostController = rememberNavController()
 ) {
-    // TODO [viewmodel]: Inject NavigationViewModel here to determine startDestination (Setup vs. Timetable)
+    val context = LocalContext.current.applicationContext
+    val repository = remember { TimetableRepository(context) }
+    val userService = remember {
+        UserTimetableService(
+            repository = repository,
+            preferencesStore = UserSchedulePreferencesStore(context.userSchedulePreferencesDataStore),
+            database = TimetableDatabase.getInstance(context)
+        )
+    }
+    val factory = remember { ViewModelFactory(repository, userService) }
+    val navigationViewModel: AppNavigationViewModel = viewModel(factory = factory)
+
+    val isSetupComplete by navigationViewModel.isSetupComplete.collectAsState()
+    val currentGroupsCode by navigationViewModel.currentGroupsCode.collectAsState()
+
     NavHost(
         navController = navController,
-        startDestination = Screen.Home.route // TODO [viewmodel]: Use ViewModel state for dynamic startDestination
+        startDestination = Screen.Home.route
     ) {
         composable(Screen.Home.route) {
-            NavScreen(navController = navController)
+            if (isSetupComplete != null) {
+                LaunchedEffect(isSetupComplete, currentGroupsCode) {
+                    val route = if (isSetupComplete == true && !currentGroupsCode.isNullOrBlank()) {
+                        Screen.Timetable.createRoute(currentGroupsCode.orEmpty())
+                    } else {
+                        Screen.InitialSetup.route
+                    }
+
+                    navController.navigate(route) {
+                        launchSingleTop = true
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                }
+            }
+
+            Box(modifier = Modifier.fillMaxSize())
         }
         composable(Screen.InitialSetup.route) {
             // TODO [viewmodel]: Provide SetupViewModel to InitialSetupScreen
@@ -82,9 +126,8 @@ fun TimetableNavHost(
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToSetup = {
-                    // reset backstack to home and navigate to setup when profile changes
                     navController.navigate(Screen.InitialSetup.route) {
-                        popUpTo(Screen.Home.route) { inclusive = false }
+                        popUpTo(Screen.Timetable.route) { inclusive = true }
                     }
                 }
             )

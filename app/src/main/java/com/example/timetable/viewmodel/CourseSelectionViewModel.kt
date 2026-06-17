@@ -21,8 +21,19 @@ class CourseSelectionViewModel(
         repository.lessonsFlow
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _searchResults = MutableStateFlow<List<Lesson>>(emptyList())
-    val searchResults: StateFlow<List<Lesson>> = _searchResults
+    private val _searchQuery = MutableStateFlow("")
+
+    val searchResults: StateFlow<List<Lesson>> =
+        combine(_searchQuery, allLessons) { query, lessons ->
+            val trimmed = query.trim()
+            if (trimmed.isBlank()) {
+                emptyList()
+            } else {
+                lessons
+                    .filter { lesson -> lesson.title.contains(trimmed, ignoreCase = true) }
+                    .distinctBy { lesson -> lesson.title to lesson.groupsCode }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val extraLessons: StateFlow<List<Lesson>> =
         combine(
@@ -58,15 +69,7 @@ class CourseSelectionViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun searchModules(query: String) {
-        val trimmedQuery = query.trim()
-        if (trimmedQuery.isBlank()) {
-            _searchResults.value = emptyList()
-            return
-        }
-
-        _searchResults.value = allLessons.value
-            .filter { lesson -> lesson.title.contains(trimmedQuery, ignoreCase = true) }
-            .distinctBy { lesson -> lesson.title to lesson.groupsCode }
+        _searchQuery.value = query
     }
 
     fun addExtraModule(groupsCode: String, title: String) {

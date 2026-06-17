@@ -7,6 +7,7 @@ import com.example.timetable.data.services.UserTimetableService
 import com.example.timetable.utils.enums.Faculty
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class InitialSetupUiState(
@@ -14,7 +15,9 @@ data class InitialSetupUiState(
     val selectedFaculty: Faculty? = null,
     val searchQuery: String = "",
     val filteredCourses: List<String> = emptyList(),
-    val isSetupComplete: Boolean = false
+    val isSetupComplete: Boolean = false,
+    val isLoading: Boolean = true,
+    val errorMessage: String? = null
 )
 
 class InitialSetupViewModel(
@@ -29,37 +32,60 @@ class InitialSetupViewModel(
         loadFaculties()
     }
 
+    fun retryLoading() {
+        loadFaculties()
+    }
+
+    private fun loadFaculties() {
+        viewModelScope.launch {
+            _uiState.update { current ->
+                current.copy(isLoading = true, errorMessage = null)
+            }
+
+            try {
+                repository.initialize()
+                _uiState.update { current ->
+                    current.copy(
+                        faculties = getFacultiesFromLessons(),
+                        isLoading = false
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update { current ->
+                    current.copy(
+                        faculties = emptyList(),
+                        isLoading = false,
+                        errorMessage = "Fehler beim Laden der Studiengänge. Bitte Internetverbindung prüfen."
+                    )
+                }
+            }
+        }
+    }
+
     fun selectFaculty(faculty: Faculty) {
-        _uiState.value = _uiState.value.copy(
-            selectedFaculty = faculty,
-            searchQuery = "",
-            filteredCourses = filterCourses(faculty, "")
-        )
+        _uiState.update { current ->
+            current.copy(
+                selectedFaculty = faculty,
+                searchQuery = "",
+                filteredCourses = filterCourses(faculty, "")
+            )
+        }
     }
 
     fun updateSearchQuery(query: String) {
-        _uiState.value = _uiState.value.copy(
-            searchQuery = query,
-            filteredCourses = filterCourses(_uiState.value.selectedFaculty, query)
-        )
+        _uiState.update { current ->
+            current.copy(
+                searchQuery = query,
+                filteredCourses = filterCourses(current.selectedFaculty, query)
+            )
+        }
     }
 
     fun completeSetup(course: String) {
         viewModelScope.launch {
             userService.completeSetup(course)
-            _uiState.value = _uiState.value.copy(isSetupComplete = true)
-        }
-    }
-
-    private fun loadFaculties() {
-        viewModelScope.launch {
-            try {
-                repository.initialize()
-                _uiState.value = _uiState.value.copy(
-                    faculties = getFacultiesFromLessons()
-                )
-            } catch (exception: Exception) {
-                _uiState.value = _uiState.value.copy(faculties = emptyList())
+            _uiState.update { current ->
+                current.copy(isSetupComplete = true)
             }
         }
     }

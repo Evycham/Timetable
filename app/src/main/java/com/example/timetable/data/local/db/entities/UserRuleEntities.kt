@@ -20,7 +20,8 @@ import androidx.room.PrimaryKey
             childColumns = ["lessonId"],
             onDelete = ForeignKey.CASCADE // löscht die Regel automatisch, falls die Einheit komplett entfällt
         )
-    ]
+    ],
+    indices = [androidx.room.Index(value = ["lessonId"])]
 )
 data class ExtraLessonEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -45,7 +46,8 @@ data class ExtraLessonEntity(
             childColumns = ["lessonId"],
             onDelete = ForeignKey.CASCADE
         )
-    ]
+    ],
+    indices = [androidx.room.Index(value = ["lessonId"])]
 )
 data class HiddenLessonEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

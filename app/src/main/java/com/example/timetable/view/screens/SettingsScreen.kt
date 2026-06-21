@@ -22,25 +22,28 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.timetable.utils.getVersionName
-import com.example.timetable.view.json.MockLogic
+import com.example.timetable.viewmodel.SettingsViewModel
 
 /**
  * Das Einstellungsmenü der App. Ermöglicht die Anpassung von Benutzereinstellungen wie
  * dem aktiven Studiengang, Farb-Themes und Benachrichtigungseinstellungen.
  *
+ * @param viewModel Das SettingsViewModel zur Speicherung der Einstellungen.
  * @param onNavigateBack Callback-Methode zur Rückkehr zur vorherigen Ansicht.
  * @param onNavigateToSetup Callback-Methode zum Zurücksetzen oder Wechseln der Fakultäts- und Kursauswahl.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    viewModel: SettingsViewModel,
     onNavigateBack: () -> Unit = {},
     onNavigateToSetup: () -> Unit = {}
 ) {
-    // track theme and switch choices locally using state wrappers
-    var isDynamicColorEnabled by remember { mutableStateOf(false) }
-    var isCancellationAlertEnabled by remember { mutableStateOf(true) }
-    var isRoomChangeAlertEnabled by remember { mutableStateOf(true) }
+    val preferences by viewModel.preferences.collectAsState()
+
+    val isDynamicColorEnabled = preferences.isDynamicColorEnabled
+    val isCancellationAlertEnabled = preferences.isCancellationAlertEnabled
+    val isRoomChangeAlertEnabled = preferences.isRoomChangeAlertEnabled
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -75,10 +78,9 @@ fun SettingsScreen(
             SettingsSectionHeader(title = "Profil & Studiengang")
 
             // compute dynamic text label based on selections in MockLogic
-            val activeModulesText = remember {
+            val activeModulesText = remember(preferences.groupsCode) {
                 derivedStateOf {
-                    if (MockLogic.selectedModuleTitles.isEmpty()) "Keine Kurse ausgewählt"
-                    else "${MockLogic.selectedModuleTitles.size} Kurse im Plan"
+                    preferences.groupsCode ?: "Kein Studiengang ausgewählt"
                 }
             }
 
@@ -124,7 +126,11 @@ fun SettingsScreen(
 
                     // visual action card for changing current active faculty/course
                     Button(
-                        onClick = onNavigateToSetup,
+                        onClick = {
+                            viewModel.resetApp {
+                                onNavigateToSetup()
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
@@ -152,7 +158,7 @@ fun SettingsScreen(
                         title = "Dynamische Farben",
                         subtitle = "Farben an dein System anpassen",
                         checked = isDynamicColorEnabled,
-                        onCheckedChange = { isDynamicColorEnabled = it }
+                        onCheckedChange = { viewModel.updateDynamicColor(it) }
                     )
                 }
             }
@@ -170,14 +176,14 @@ fun SettingsScreen(
                         title = "Vorlesungsausfälle",
                         subtitle = "Benachrichtigung bei abgesagten Vorlesungen",
                         checked = isCancellationAlertEnabled,
-                        onCheckedChange = { isCancellationAlertEnabled = it }
+                        onCheckedChange = { viewModel.updateCancellationAlert(it) }
                     )
                     SettingsToggleRow(
                         icon = Icons.Default.Notifications,
                         title = "Raumänderungen",
                         subtitle = "Benachrichtigung bei Raum- oder Zeitänderungen",
                         checked = isRoomChangeAlertEnabled,
-                        onCheckedChange = { isRoomChangeAlertEnabled = it }
+                        onCheckedChange = { viewModel.updateRoomChangeAlert(it) }
                     )
                 }
             }

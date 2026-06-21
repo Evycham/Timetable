@@ -17,8 +17,20 @@ class CourseSelectionViewModel(
     private val userService: UserTimetableService
 ) : ViewModel() {
 
-    private val allLessons: StateFlow<List<Lesson>> =
+    val allLessons: StateFlow<List<Lesson>> =
         repository.lessonsFlow
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val preferences: StateFlow<com.example.timetable.data.local.preferences.UserSchedulePreferences> =
+        userService.preferencesFlow
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                com.example.timetable.data.local.preferences.UserSchedulePreferences()
+            )
+
+    val userLessons: StateFlow<List<Lesson>> =
+        userService.userLessonsFlow()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _searchQuery = MutableStateFlow("")

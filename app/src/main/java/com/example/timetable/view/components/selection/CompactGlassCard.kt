@@ -26,7 +26,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.timetable.view.json.JsonLesson
+import com.example.timetable.data.model.Lesson
 
 /**
  * Karte im zur Anzeige von Suchergebnissen für Module.
@@ -39,7 +39,7 @@ import com.example.timetable.view.json.JsonLesson
  */
 @Composable
 fun CompactGlassCard(
-    lesson: JsonLesson,
+    lesson: Lesson,
     conflictInfo: String?,
     isSelected: Boolean,
     onClick: () -> Unit
@@ -103,7 +103,7 @@ fun CompactGlassCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = " ${lesson.lecturer}",
+                        text = " ${lesson.teacher?.joinToString(", ").orEmpty()}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -117,7 +117,7 @@ fun CompactGlassCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = " ${lesson.room.substringBefore(" (")}",
+                        text = " ${lesson.rooms?.firstOrNull()?.substringBefore(" (").orEmpty()}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )

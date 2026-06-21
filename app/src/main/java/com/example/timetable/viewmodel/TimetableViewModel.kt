@@ -24,6 +24,14 @@ class TimetableViewModel(
                 emptyList()
             )
 
+    val preferences: StateFlow<com.example.timetable.data.local.preferences.UserSchedulePreferences> =
+        userService.preferencesFlow
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                com.example.timetable.data.local.preferences.UserSchedulePreferences()
+            )
+
     val syncState: StateFlow<RepositorySyncState> = repository.syncState
 
     init {
@@ -31,7 +39,7 @@ class TimetableViewModel(
             try {
                 repository.initialize()
                 repository.updateJsonIfNeeded()
-            } catch (exception: Exception) {
+            } catch (_: Exception) {
                 // syncState reports repository errors
             }
         }
@@ -46,11 +54,23 @@ class TimetableViewModel(
         }
     }
 
+    fun removeExtraModule(groupsCode: String, title: String) {
+        viewModelScope.launch {
+            userService.removeExtraLesson(groupsCode, title)
+        }
+    }
+
+    fun hideModule(groupsCode: String, title: String) {
+        viewModelScope.launch {
+            userService.hideLesson(groupsCode, title)
+        }
+    }
+
     fun triggerRefresh() {
         viewModelScope.launch {
             try {
                 repository.reloadJson()
-            } catch (exception: Exception) {
+            } catch (_: Exception) {
                 // syncState reports repository errors
             }
         }

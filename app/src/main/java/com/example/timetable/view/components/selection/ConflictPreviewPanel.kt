@@ -13,12 +13,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.timetable.view.json.JsonLesson
+import com.example.timetable.data.model.Lesson
 
 @Composable
 fun ConflictPreviewPanel(
-    lesson: JsonLesson,
+    lesson: Lesson,
     conflictInfo: String?,
+    buttonText: String = "In den Plan aufnehmen",
     onAdd: () -> Unit
 ) {
     Surface(
@@ -104,7 +105,7 @@ fun ConflictPreviewPanel(
                 ) else ButtonDefaults.buttonColors()
             ) {
                 Text(
-                    text = if (conflictInfo != null) "Trotzdem hinzufügen" else "In den Plan aufnehmen",
+                    text = if (conflictInfo != null) "Trotzdem $buttonText" else buttonText,
                     fontWeight = FontWeight.Bold
                 )
             }

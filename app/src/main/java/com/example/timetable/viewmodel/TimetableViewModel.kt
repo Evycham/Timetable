@@ -37,6 +37,15 @@ class TimetableViewModel(
         }
     }
 
+    /**
+     * Speichert oder aktualisiert ein Emoji für eine Veranstaltung
+     */
+    fun updateModuleEmoji(title: String, emoji: String) {
+        viewModelScope.launch {
+            userService.updateModuleEmoji(title, emoji)
+        }
+    }
+
     fun triggerRefresh() {
         viewModelScope.launch {
             try {

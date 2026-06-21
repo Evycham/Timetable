@@ -148,7 +148,7 @@ class UserSchedulePreferencesStore(
                 map[key] = value
             }
             map
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyMap()
         }
     }

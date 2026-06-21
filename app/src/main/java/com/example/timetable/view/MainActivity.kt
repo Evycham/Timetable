@@ -1,5 +1,6 @@
 package com.example.timetable.view
 
+import java.util.concurrent.TimeUnit
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -26,15 +27,30 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
 import com.example.timetable.view.components.common.AnimatedBackground
 import com.example.timetable.view.navigation.TimetableNavHost
 import com.example.timetable.view.theme.TimeTableTheme
 import com.example.timetable.view.navigation.Screen
+import androidx.work.WorkManager
+import com.example.timetable.data.services.TimetableSyncWorker
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // register periodic backdround-sync-worker (every 1.5hrs from 7..19 + random delay (max 5mins))
+        val syncRequest = PeriodicWorkRequestBuilder<TimetableSyncWorker>(
+            90, TimeUnit.MINUTES
+        ).build()
+
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            "timetable_sync_work",
+            ExistingPeriodicWorkPolicy.KEEP,
+            syncRequest
+        )
 
         setContent {
             TimeTableTheme {

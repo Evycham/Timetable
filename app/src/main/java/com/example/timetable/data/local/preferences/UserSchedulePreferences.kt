@@ -11,11 +11,13 @@ package com.example.timetable.data.local.preferences
  * @property isDynamicColorEnabled Aktiviert das dynamische Farbschema der App (über Material You)
  * @property isCancellationAlertEnabled Steuert, ob Benachrichtigungen bei Vorlesungsausfällen aktiv sind
  * @property isRoomChangeAlertEnabled Steuert, ob Benachrichtigungen bei Raumänderungen aktiv sind
+ * @property moduleEmojis Speichert die für Veranstaltungen gewählten Emojis
  */
 data class UserSchedulePreferences(
     val isSetupComplete: Boolean = false,
     val groupsCode: String? = null,
     val isDynamicColorEnabled: Boolean = false,
     val isCancellationAlertEnabled: Boolean = true,
-    val isRoomChangeAlertEnabled: Boolean = true
+    val isRoomChangeAlertEnabled: Boolean = true,
+    val moduleEmojis: Map<String, String> = emptyMap()
 )

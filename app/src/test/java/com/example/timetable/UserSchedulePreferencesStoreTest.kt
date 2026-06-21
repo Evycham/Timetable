@@ -35,4 +35,32 @@ class UserSchedulePreferencesStoreTest {
         assertEquals("mb-MBB_4", preferences.groupsCode)
         assertTrue(preferences.isDynamicColorEnabled)
     }
+
+    @Test
+    fun save_and_load_preferences_with_emojis() = runBlocking {
+        val tempDir = Files.createTempDirectory("preferences-store-emojis-test").toFile()
+        val dataStore = PreferenceDataStoreFactory.create(
+            produceFile = { tempDir.resolve("user-preferences.preferences_pb") }
+        )
+        val store = UserSchedulePreferencesStore(dataStore)
+
+        val emojis = mapOf("Maths" to "📐", "Physics" to "⚛️")
+        val newPrefs = UserSchedulePreferences(
+            isSetupComplete = true,
+            groupsCode = "mb-MBB_4",
+            isDynamicColorEnabled = true,
+            moduleEmojis = emojis
+        )
+        store.save(newPrefs)
+
+        val preferences = store.preferencesFlow.first()
+        assertEquals(emojis, preferences.moduleEmojis)
+        assertEquals("📐", preferences.moduleEmojis["Maths"])
+        assertEquals("⚛️", preferences.moduleEmojis["Physics"])
+
+        // Update to empty
+        store.update { it.copy(moduleEmojis = emptyMap()) }
+        val updatedPrefs = store.preferencesFlow.first()
+        assertTrue(updatedPrefs.moduleEmojis.isEmpty())
+    }
 }

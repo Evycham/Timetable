@@ -1,22 +1,30 @@
+@file:OptIn(ExperimentalFoundationApi::class)
+
 package com.example.timetable.view.components.timetable
 
 import com.example.timetable.view.components.common.EmptyStateView
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,8 +34,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.timetable.view.json.JsonLesson
-import com.example.timetable.view.json.MockLogic
+import androidx.compose.ui.window.Dialog
+import com.example.timetable.data.model.Lesson
 import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
@@ -39,15 +47,19 @@ import java.time.temporal.ChronoUnit
  * angezeigte Woche mit der aktuellen Kalenderwoche übereinstimmt.
  *
  * @param lessons Die anzuzeigenden Vorlesungen der Woche.
+ * @param customEmojis Zugeordnete Emojis für die Veranstaltungen.
  * @param currentTime Die aktuelle Uhrzeit für die rote Zeitlinie. Wenn `null`, wird keine Linie gerendert.
  * @param onLessonClick Callback-Methode bei Klick auf einen Vorlesungseintrag.
  */
 @Composable
 fun TimetableGrid(
-    lessons: List<JsonLesson>,
+    lessons: List<Lesson>,
+    customEmojis: Map<String, String> = emptyMap(),
     currentTime: LocalTime? = null,
-    onLessonClick: (JsonLesson) -> Unit
+    onLessonClick: (Lesson) -> Unit
 ) {
+    var showPopOutLessons by remember { mutableStateOf<List<Lesson>?>(null) }
+    var activeSlotDisplayLesson by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     val days = listOf(
         DayOfWeek.MONDAY,
         DayOfWeek.TUESDAY,
@@ -181,8 +193,13 @@ fun TimetableGrid(
                     ) {
                         // filter and render lessons matching active weekday
                         val dayLessons = lessons.filter { it.dayOfWeek == day }
+                        val groupedSlots =
+                            remember(dayLessons) { groupOverlappingLessons(dayLessons) }
 
-                        dayLessons.forEach { lesson ->
+                        groupedSlots.forEach { slot ->
+                            val defaultPrimary = slot.first()
+                            val displayedLessonId = activeSlotDisplayLesson[defaultPrimary.id]
+                            val lesson = slot.find { it.id == displayedLessonId } ?: defaultPrimary
                             val startTime = try {
                                 LocalTime.parse(lesson.startTime)
                             } catch (_: Exception) {
@@ -207,12 +224,15 @@ fun TimetableGrid(
 
                                 LessonGridItem(
                                     lesson = lesson,
+                                    customEmoji = customEmojis[lesson.title],
                                     modifier = Modifier
                                         .padding(2.dp)
                                         .offset(y = topOffset)
                                         .height(height)
                                         .fillMaxWidth(),
-                                    onClick = { onLessonClick(lesson) }
+                                    overlapCount = slot.size,
+                                    onClick = { onLessonClick(lesson) },
+                                    onLongClick = { showPopOutLessons = slot }
                                 )
                             }
                         }
@@ -259,6 +279,64 @@ fun TimetableGrid(
             }
         }
     }
+
+    showPopOutLessons?.let { overlappingLessons ->
+        Dialog(onDismissRequest = { showPopOutLessons = null }) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(vertical = 16.dp)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Überschneidungen",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+                    )
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp)
+                    ) {
+                        items(overlappingLessons.size) { index ->
+                            val lesson = overlappingLessons[index]
+                            val facultyColor = when {
+                                lesson.title.startsWith("eti-") -> Color(0xff00bfff)
+                                lesson.title.startsWith("mb-") -> Color(0xffffd700)
+                                lesson.title.startsWith("ws-") -> Color(0xff10b981)
+                                else -> MaterialTheme.colorScheme.primary
+                            }
+                            TimetableLessonCard(
+                                lesson = lesson,
+                                accentColor = facultyColor,
+                                customEmoji = customEmojis[lesson.title],
+                                onClick = {
+                                    onLessonClick(lesson)
+                                    val defaultPrimary = overlappingLessons.first()
+                                    activeSlotDisplayLesson =
+                                        activeSlotDisplayLesson + (defaultPrimary.id to lesson.id)
+                                    showPopOutLessons = null
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -266,14 +344,18 @@ fun TimetableGrid(
  * nach Fakultätszugehörigkeit.
  *
  * @param lesson Die darzustellende Vorlesung.
+ * @param customEmoji Das optionale benutzerdefinierte Emoji.
  * @param modifier Der Modifier für Layout-Anpassungen des Kachel-Elements.
  * @param onClick Callback bei Klick auf die Kachel.
  */
 @Composable
 fun LessonGridItem(
-    lesson: JsonLesson,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    lesson: Lesson,
+    customEmoji: String? = null,
+    overlapCount: Int = 1,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
     // determine color code matching course faculty prefixes
     val facultyColor = when {
@@ -283,90 +365,173 @@ fun LessonGridItem(
         else -> MaterialTheme.colorScheme.primary
     }
 
-    val displayTitle = remember(lesson.title) {
-        lesson.title.substringAfter("-")
-    }
-
     Surface(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .clickable { onClick() },
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         color = facultyColor.copy(alpha = 0.2f),
         border = BorderStroke(1.dp, facultyColor.copy(alpha = 0.3f)),
         shape = RoundedCornerShape(8.dp),
         tonalElevation = 2.dp
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(4.dp)
-                    .background(facultyColor)
-            )
-
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 6.dp, vertical = 6.dp)
-                    .weight(1f)
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.SpaceBetween
+        Box(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxSize()
             ) {
-                // upper half: centered large course icon
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val icon = remember(lesson.title) {
-                        CourseIcons.getIcon(MockLogic.moduleEmojis[lesson.title])
-                    }
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = facultyColor,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 8.dp)
-                    )
-                }
+                        .fillMaxHeight()
+                        .width(4.dp)
+                        .background(facultyColor)
+                )
 
-                // lower half: course name and bigger, bolder location
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    modifier = Modifier
+                        .padding(horizontal = 6.dp, vertical = 6.dp)
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // use only user-defined icons as identification in weekview
-                    /*
-                    Text(
-                        text = displayTitle,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 9.sp,
-                            lineHeight = 10.sp
-                        ),
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                     */
+                    // upper half: centered large course icon
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val icon = remember(lesson.title, customEmoji) {
+                            CourseIcons.getIcon(customEmoji)
+                        }
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = facultyColor,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 8.dp)
+                        )
+                    }
 
-                    Text(
-                        text = lesson.room.substringBefore(" ("),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 14.sp,
-                            lineHeight = 16.sp
-                        ),
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    // lower half: course name and bigger, bolder location
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = lesson.rooms?.firstOrNull()?.substringBefore(" (") ?: "",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 14.sp,
+                                lineHeight = 16.sp
+                            ),
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+
+            // Stack badge
+            if (overlapCount > 1) {
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiary,
+                    contentColor = MaterialTheme.colorScheme.onTertiary,
+                    shape = RoundedCornerShape(
+                        topStart = 0.dp,
+                        bottomStart = 8.dp,
+                        topEnd = 0.dp,
+                        bottomEnd = 0.dp
+                    ),
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Layers,
+                            contentDescription = null,
+                            modifier = Modifier.size(10.dp)
+                        )
+                        Text(
+                            text = "+$overlapCount",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+private val Lesson.dayOfWeek: DayOfWeek?
+    get() = try {
+        java.time.LocalDate.parse(date).dayOfWeek
+    } catch (_: Exception) {
+        null
+    }
+
+internal fun groupOverlappingLessons(lessons: List<Lesson>): List<List<Lesson>> {
+    if (lessons.isEmpty()) return emptyList()
+    // Sort lessons by start time
+    val sorted = lessons.sortedBy { lesson ->
+        try {
+            LocalTime.parse(lesson.startTime)
+        } catch (_: Exception) {
+            LocalTime.MIN
+        }
+    }
+    val groups = mutableListOf<MutableList<Lesson>>()
+    var currentGroup = mutableListOf<Lesson>()
+    var currentMaxEnd: LocalTime? = null
+
+    for (lesson in sorted) {
+        val start = try {
+            LocalTime.parse(lesson.startTime)
+        } catch (_: Exception) {
+            null
+        }
+        val end = try {
+            LocalTime.parse(lesson.endTime)
+        } catch (_: Exception) {
+            null
+        }
+
+        if (start == null || end == null) {
+            // Put invalid times into their own group
+            groups.add(mutableListOf(lesson))
+            continue
+        }
+
+        if (currentGroup.isEmpty()) {
+            currentGroup.add(lesson)
+            currentMaxEnd = end
+        } else {
+            // Check if it overlaps with the current group
+            if (start.isBefore(currentMaxEnd)) {
+                currentGroup.add(lesson)
+                if (end.isAfter(currentMaxEnd)) {
+                    currentMaxEnd = end
+                }
+            } else {
+                groups.add(currentGroup)
+                currentGroup = mutableListOf(lesson)
+                currentMaxEnd = end
+            }
+        }
+    }
+    if (currentGroup.isNotEmpty()) {
+        groups.add(currentGroup)
+    }
+    return groups
 }

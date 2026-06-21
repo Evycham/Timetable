@@ -16,7 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -24,9 +23,8 @@ import com.example.timetable.view.components.selection.CompactGlassCard
 import com.example.timetable.view.components.common.CompactGlassCardSkeleton
 import com.example.timetable.view.components.selection.ConflictPreviewPanel
 import com.example.timetable.view.components.common.EmptyStateView
-import com.example.timetable.view.json.JsonLesson
-import com.example.timetable.view.json.JsonLessonRepository
-import com.example.timetable.view.json.MockLogic
+import com.example.timetable.data.model.Lesson
+import com.example.timetable.viewmodel.CourseSelectionViewModel
 
 /**
  * Ein Bildschirm, der dem Benutzer die Suche nach Modulen ermöglicht.
@@ -35,45 +33,28 @@ import com.example.timetable.view.json.MockLogic
  * Terminüberschneidungen mit bereits hinzugefügten Vorlesungen anzuzeigen, bevor
  * das Modul in den Plan eingetragen werden kann.
  *
+ * @param viewModel Das ViewModel zur Modulsuche und -verwaltung.
  * @param onNavigateBack Callback-Methode zur Rückkehr zur vorherigen Ansicht.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CourseSelectionScreen(
+    viewModel: CourseSelectionViewModel,
     onNavigateBack: () -> Unit = {}
 ) {
-    // initialize repositories and user current module selection states
-    val context = LocalContext.current
-    val repository = remember { JsonLessonRepository(context) }
+    val searchResults by viewModel.searchResults.collectAsState()
+    val preferences by viewModel.preferences.collectAsState()
+    val userLessons by viewModel.userLessons.collectAsState()
+    val allLessons by viewModel.allLessons.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
-    var selectedResult by remember { mutableStateOf<JsonLesson?>(null) }
+    var selectedResult by remember { mutableStateOf<Lesson?>(null) }
 
     // for hiding the keyboard on selection
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    // perform schedule collision check against active module database
-    val userLessons = remember(MockLogic.selectedModuleTitles.size) {
-        MockLogic.selectedModuleTitles.flatMap { repository.getLessonsByModuleTitle(it) }
-    }
-
-    // query matching modules based on user search query
-    val results = remember(searchQuery) {
-        if (searchQuery.length < 2) emptyList()
-        else repository.searchModules(searchQuery)
-    }
-
-    // simulate network loading latency using a timed delay
-    var isLoading by remember { mutableStateOf(false) }
-    LaunchedEffect(searchQuery) {
-        if (searchQuery.length >= 2) {
-            isLoading = true
-            // delay(100) // remove delay to fix test flakiness
-            isLoading = false
-        } else {
-            isLoading = false
-        }
-    }
+    val results = searchResults
+    val isLoading = false
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -99,7 +80,10 @@ fun CourseSelectionScreen(
             // text field fuzzy query filter input
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
+                onValueChange = {
+                    searchQuery = it
+                    viewModel.searchModules(it)
+                },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Name, Dozent, Raum...", modifier = Modifier.alpha(0.5f)) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
@@ -145,7 +129,7 @@ fun CourseSelectionScreen(
                         contentPadding = PaddingValues(bottom = 120.dp)
                     ) {
                         itemsIndexed(results) { index, lesson ->
-                            val moduleLessons = repository.getLessonsByModuleTitle(lesson.title)
+                            val moduleLessons = allLessons.filter { it.title == lesson.title }
                             val conflict = findFirstConflict(moduleLessons, userLessons)
 
                             var isVisible by remember { mutableStateOf(false) }
@@ -197,14 +181,37 @@ fun CourseSelectionScreen(
             exit = fadeOut() + shrinkVertically()
         ) {
             selectedResult?.let { lesson ->
-                val moduleLessons = repository.getLessonsByModuleTitle(lesson.title)
+                val moduleLessons = allLessons.filter { it.title == lesson.title }
                 val conflict = findFirstConflict(moduleLessons, userLessons)
+
+                val primaryCode = preferences.groupsCode ?: ""
+                val isCoreModule = lesson.groupsCode.contains(primaryCode)
+                val isCurrentlyVisible = userLessons.any { it.title == lesson.title }
+
+                val buttonText = if (isCoreModule) {
+                    if (isCurrentlyVisible) "Ausblenden" else "Einblenden"
+                } else {
+                    if (isCurrentlyVisible) "Aus Plan entfernen" else "In den Plan aufnehmen"
+                }
 
                 ConflictPreviewPanel(
                     lesson = lesson,
                     conflictInfo = conflict,
+                    buttonText = buttonText,
                     onAdd = {
-                        MockLogic.addModule(lesson.title)
+                        if (isCoreModule) {
+                            if (isCurrentlyVisible) {
+                                viewModel.hideModule(primaryCode, lesson.title)
+                            } else {
+                                viewModel.showModule(primaryCode, lesson.title)
+                            }
+                        } else {
+                            if (isCurrentlyVisible) {
+                                viewModel.removeExtraModule(primaryCode, lesson.title)
+                            } else {
+                                viewModel.addExtraModule(primaryCode, lesson.title)
+                            }
+                        }
                         onNavigateBack()
                     }
                 )
@@ -222,8 +229,8 @@ fun CourseSelectionScreen(
  * @return Eine Fehlermeldung mit Tag, Uhrzeit und Konflikt-Modul, wenn ein Konflikt existiert, andernfalls `null`.
  */
 private fun findFirstConflict(
-    newModuleLessons: List<JsonLesson>,
-    existingLessons: List<JsonLesson>
+    newModuleLessons: List<Lesson>,
+    existingLessons: List<Lesson>
 ): String? {
     // helper method resolving first matching slot conflict
     for (newLesson in newModuleLessons) {
@@ -231,7 +238,11 @@ private fun findFirstConflict(
             if (newLesson.date == existing.date &&
                 newLesson.startTime == existing.startTime
             ) {
-                val day = newLesson.dayOfWeek?.name?.take(2) ?: ""
+                val day = try {
+                    java.time.LocalDate.parse(newLesson.date).dayOfWeek.name.take(2)
+                } catch (_: Exception) {
+                    ""
+                }
                 return "$day ${newLesson.startTime} - Kollision mit ${existing.title}"
             }
         }

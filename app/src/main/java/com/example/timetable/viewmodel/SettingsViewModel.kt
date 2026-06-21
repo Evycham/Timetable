@@ -15,7 +15,38 @@ class SettingsViewModel(
 
     val preferences: StateFlow<UserSchedulePreferences> =
         userService.preferencesFlow
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserSchedulePreferences())
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                UserSchedulePreferences()
+            )
+
+    /**
+     * Aktualisiert die Einstellung für das dynamische Farbschema
+     */
+    fun updateDynamicColor(enabled: Boolean) {
+        viewModelScope.launch {
+            userService.setDynamicColorEnabled(enabled)
+        }
+    }
+
+    /**
+     * Aktualisiert die Einstellung für Benachrichtigungen bei Vorlesungsausfällen
+     */
+    fun updateCancellationAlert(enabled: Boolean) {
+        viewModelScope.launch {
+            userService.setCancellationAlertEnabled(enabled)
+        }
+    }
+
+    /**
+     * Aktualisiert die Einstellung für Benachrichtigungen bei Raumänderungen
+     */
+    fun updateRoomChangeAlert(enabled: Boolean) {
+        viewModelScope.launch {
+            userService.setRoomChangeAlertEnabled(enabled)
+        }
+    }
 
     fun resetApp(onComplete: () -> Unit) {
         viewModelScope.launch {

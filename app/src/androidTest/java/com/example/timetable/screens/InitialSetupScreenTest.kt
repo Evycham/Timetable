@@ -8,9 +8,18 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.timetable.data.local.db.TimetableDatabase
+import com.example.timetable.data.local.preferences.UserSchedulePreferencesStore
+import com.example.timetable.data.local.preferences.userSchedulePreferencesDataStore
+import com.example.timetable.data.repository.TimetableRepository
+import com.example.timetable.data.services.UserTimetableService
 import com.example.timetable.utils.enums.Faculty
 import com.example.timetable.view.screens.InitialSetupScreen
+import com.example.timetable.viewmodel.InitialSetupViewModel
+import kotlinx.coroutines.runBlocking
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,10 +34,25 @@ class InitialSetupScreenTest {
     @get:Rule
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
+    private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+    private val repository = TimetableRepository(context)
+    private val preferencesStore = UserSchedulePreferencesStore(context.userSchedulePreferencesDataStore)
+    private val database = TimetableDatabase.getInstance(context)
+    private val userService = UserTimetableService(repository, preferencesStore, database)
+    private val viewModel = InitialSetupViewModel(repository, userService)
+
+    @Before
+    fun setUp() = runBlocking {
+        preferencesStore.clear()
+    }
+
     @Test
     fun initialSetupScreen_displaysCorrectly() {
         composeTestRule.setContent {
-            InitialSetupScreen(onNavigateToTimetable = { })
+            InitialSetupScreen(
+                viewModel = viewModel,
+                onNavigateToTimetable = { }
+            )
         }
 
         composeTestRule.onNodeWithText("HOSTvinci").assertIsDisplayed()
@@ -44,7 +68,10 @@ class InitialSetupScreenTest {
     @Test
     fun facultyChip_selectionWorks() {
         composeTestRule.setContent {
-            InitialSetupScreen(onNavigateToTimetable = { })
+            InitialSetupScreen(
+                viewModel = viewModel,
+                onNavigateToTimetable = { }
+            )
         }
 
         val targetFaculty = Faculty.ETI
@@ -62,7 +89,10 @@ class InitialSetupScreenTest {
     @Test
     fun initialSetupScreen_onFirstStart_searchIsHidden() {
         composeTestRule.setContent {
-            InitialSetupScreen(onNavigateToTimetable = { })
+            InitialSetupScreen(
+                viewModel = viewModel,
+                onNavigateToTimetable = { }
+            )
         }
 
         // Am Anfang sollte das Suchfeld nicht existieren
@@ -73,7 +103,10 @@ class InitialSetupScreenTest {
     fun initialSetupScreen_selectionAndContinue_triggersNavigation() {
         var navigationCalled = false
         composeTestRule.setContent {
-            InitialSetupScreen(onNavigateToTimetable = { navigationCalled = true })
+            InitialSetupScreen(
+                viewModel = viewModel,
+                onNavigateToTimetable = { navigationCalled = true }
+            )
         }
 
         // 1. Fakultät wählen

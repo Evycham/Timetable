@@ -33,7 +33,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PrecisionManufacturing
 import androidx.compose.material.icons.filled.Psychology
@@ -73,7 +73,7 @@ object CourseIcons {
         "Science" to Icons.Default.Science,
         "Biotech" to Icons.Default.Biotech,
         "Psychology" to Icons.Default.Psychology,
-        "MenuBook" to Icons.Default.MenuBook,
+        "MenuBook" to Icons.AutoMirrored.Filled.MenuBook,
         "AutoStories" to Icons.Default.AutoStories,
         "Translate" to Icons.Default.Translate,
         "Architecture" to Icons.Default.Architecture,
@@ -100,7 +100,7 @@ object CourseIcons {
      * Fallback ist das MenuBook-Icon.
      */
     fun getIcon(name: String?): ImageVector {
-        return iconsMap[name] ?: Icons.Default.MenuBook
+        return iconsMap[name] ?: Icons.AutoMirrored.Filled.MenuBook
     }
 }
 

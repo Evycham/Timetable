@@ -224,6 +224,7 @@ Enthält nur noch einfache Einstellungen wie:
 - `isDynamicColorEnabled`
 - `isCancellationAlertEnabled`
 - `isRoomChangeAlertEnabled`
+- `moduleEmojis` (Speichert Modulname -> Emoji Zuordnungen)
 
 Da komplexe JSON-Regeln in relationale Room-Tabellen ausgelagert wurden, bleibt diese
 Preferences-Klasse klein, performant und typsicher.
@@ -304,6 +305,17 @@ Preferences-Klasse klein, performant und typsicher.
   ab) unter Verwendung stabiler Koordinatenvergleiche.
 - Liefert eine Liste von `TimetableAlert`-Objekten an Services oder Worker zur Anzeige lokaler
   Push-Benachrichtigungen.
+
+### TimtableSyncWorker
+
+**Datei:** `TimtableSyncWorker.kt`
+
+- Führt im Hintergrund periodisch (alle 1,5 Stunden zwischen 07:00 und 19:00 Uhr) die Synchronisierung durch.
+- Holt den aktuellen Stundenplan-Snapshot des Nutzers vor dem Update.
+- Triggere `repository.updateJsonIfNeeded()`.
+- Vergleicht bei neuen Daten den alten und neuen Zustand mittels `TimetableAlertDetector.detectAlerts(...)`.
+- Liest die Benachrichtigungseinstellungen (`isCancellationAlertEnabled`, `isRoomChangeAlertEnabled`) aus und erstellt lokale Systembenachrichtigungen für jeden aktivierten Alert im Notification Channel `timetable_alerts`.
+
 
 ---
 
@@ -572,19 +584,14 @@ anbieten.
 
 ## Bewusst nicht umgesetzt
 
-- Vollständige Benachrichtigungs-Worker-Infrastruktur: Die Registrierung und Periodizität des
-  Workers gehören in die View- / App-Schicht. Der Daten-Layer liefert mit `TimetableAlertDetector`
-  lediglich die Business-Logik zur Änderungserkennung.
+- Vollständige server-seitige Push-Infrastruktur (Firebase Cloud Messaging). Stattdessen wird lokales Polling per WorkManager verwendet.
 
 ---
 
-## Sinnvolle nächste Schritte
+## Implementierte Features (kürzlich hinzugefügt)
 
-1. **ViewModel-Anbindung**: Erstellen von ViewModels, die die Startlogik (`initialize` /
-   `updateJsonIfNeeded`) kapseln und die Flows für Compose bereitstellen.
-2. **WorkManager-Integration**: Einrichten eines periodischen Hintergrund-Workers, der
-   `repository.updateJsonIfNeeded()` triggert und im Fall von Änderungen über
-   `TimetableAlertDetector` Push-Benachrichtigungen sendet.
+1. **ViewModel-Anbindung**: `SettingsViewModel` und `TimetableViewModel` binden nun die neuen Einstellungen (dynamische Farbe, Benachrichtigungen) und die Modul-Emoji Zuordnungen direkt an den Service an.
+2. **WorkManager-Integration**: Periodischer Hintergrund-Worker `TimtableSyncWorker` (ausgeführt alle 1,5 Stunden zwischen 07:00 und 19:00 Uhr) zur Prüfung auf Stundenplan-Updates und zur lokalen Benachrichtigung bei Ausfällen/Änderungen.
 
 ---
 

@@ -82,6 +82,57 @@ class UserTimetableServiceTest {
         database.close()
     }
 
+    @Test
+    fun test_preference_toggles_and_emoji_management() = runBlocking {
+        val tempDir = Files.createTempDirectory("user-timetable-service-prefs-test").toFile()
+        val database = createDatabase()
+        val repository = TimetableRepository(
+            context = applicationContext(),
+            api = DaVinciApi(downloader = { sampleJson() }),
+            database = database
+        )
+        repository.initialize()
+
+        val preferencesStore = createPreferencesStore(tempDir)
+        val userService = UserTimetableService(repository, preferencesStore, database)
+
+        // Verify default alert settings
+        var prefs = userService.getPreferences()
+        assertTrue(prefs.isCancellationAlertEnabled)
+        assertTrue(prefs.isRoomChangeAlertEnabled)
+        assertTrue(!prefs.isDynamicColorEnabled)
+        assertTrue(prefs.moduleEmojis.isEmpty())
+
+        // Change alert preferences
+        userService.setCancellationAlertEnabled(false)
+        userService.setRoomChangeAlertEnabled(false)
+        userService.setDynamicColorEnabled(true)
+
+        prefs = userService.getPreferences()
+        assertTrue(!prefs.isCancellationAlertEnabled)
+        assertTrue(!prefs.isRoomChangeAlertEnabled)
+        assertTrue(prefs.isDynamicColorEnabled)
+
+        // Manage emojis
+        userService.updateModuleEmoji("Mathe", "📐")
+        userService.updateModuleEmoji("Informatik", "💻")
+
+        prefs = userService.getPreferences()
+        assertEquals(2, prefs.moduleEmojis.size)
+        assertEquals("📐", prefs.moduleEmojis["Mathe"])
+        assertEquals("💻", prefs.moduleEmojis["Informatik"])
+
+        // Remove an emoji
+        userService.removeModuleEmoji("Mathe")
+        prefs = userService.getPreferences()
+        assertEquals(1, prefs.moduleEmojis.size)
+        assertEquals("💻", prefs.moduleEmojis["Informatik"])
+        assertTrue(!prefs.moduleEmojis.containsKey("Mathe"))
+
+        database.close()
+    }
+
+
     private fun createPreferencesStore(tempDir: java.io.File): UserSchedulePreferencesStore {
         val dataStore = PreferenceDataStoreFactory.create(
             produceFile = { tempDir.resolve("user-timetable.preferences_pb") }

@@ -6,8 +6,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.graphics.Color
 import com.example.timetable.view.components.timetable.TimetableLessonCard
-import com.example.timetable.view.json.JsonLesson
-import com.example.timetable.view.json.JsonLessonChange
+import com.example.timetable.data.model.Lesson
 import com.example.timetable.view.theme.TimeTableTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -20,18 +19,19 @@ class TimetableLessonCardTest {
 
     @Test
     fun timetableLessonCard_displaysAllDetailsAndHandlesClick() {
-        val testLesson = JsonLesson(
+        val testLesson = Lesson(
             id = "lesson-123",
             title = "Mathematik I",
             date = "2026-06-15",
             startTime = "09:45",
             endTime = "11:15",
-            room = "4/206 (H4)",
-            lecturer = "Dr. Müller",
-            course = "eti-INF_2",
-            change = JsonLessonChange(
+            rooms = setOf("4/206 (H4)"),
+            teacher = setOf("Dr. Müller"),
+            groupsCode = setOf("eti-INF_2"),
+            change = Lesson.Change(
                 caption = "Fällt aus",
-                message = "Fällt aus"
+                reasonType = "cancellation",
+                modified = "2026-06-15"
             )
         )
 

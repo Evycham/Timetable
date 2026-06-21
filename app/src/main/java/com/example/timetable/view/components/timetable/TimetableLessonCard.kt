@@ -27,9 +27,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.timetable.view.json.JsonLesson
-import com.example.timetable.view.json.MockLogic
+import com.example.timetable.data.model.Lesson
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Lesson Card.
@@ -37,9 +37,10 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun TimetableLessonCard(
-    lesson: JsonLesson,
+    lesson: Lesson,
     accentColor: Color,
     isPast: Boolean = false,
+    customEmoji: String? = null,
     onClick: () -> Unit
 ) {
     var isPressed by remember { mutableStateOf(false) }
@@ -50,7 +51,7 @@ fun TimetableLessonCard(
     LaunchedEffect(lesson.change) {
         if (lesson.change != null) {
             showPulse = true
-            delay(10000)
+            delay(10000.milliseconds)
             showPulse = false
         }
     }
@@ -130,9 +131,8 @@ fun TimetableLessonCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
-                        // TODO [viewmodel]: Query chosen custom icon reactively from ViewModel/DataStore instead of MockLogic
-                        val icon = remember(lesson.title) {
-                            CourseIcons.getIcon(MockLogic.moduleEmojis[lesson.title])
+                        val icon = remember(lesson.title, customEmoji) {
+                            CourseIcons.getIcon(customEmoji)
                         }
                         Icon(
                             imageVector = icon,
@@ -197,7 +197,9 @@ fun TimetableLessonCard(
                         "${lesson.startTime} - ${lesson.endTime}"
                     )
 
-                    val roomText = lesson.room.substringBefore(" (").ifBlank { "Raum n.a." }
+                    val roomText =
+                        lesson.rooms?.firstOrNull()?.substringBefore(" (")?.ifBlank { "Raum n.a." }
+                            ?: "Raum n.a."
                     LessonInfoItem(Icons.Default.LocationOn, roomText)
                 }
             }
@@ -223,9 +225,9 @@ private fun LessonInfoItem(icon: ImageVector, text: String) {
     }
 }
 
-private val JsonLesson.isChangeCancellation: Boolean
+private val Lesson.isChangeCancellation: Boolean
     get() = change?.let {
-        it.caption.contains("aus", ignoreCase = true) ||
-                it.message.contains("aus", ignoreCase = true) ||
-                it.caption.contains("cancell", ignoreCase = true)
+        it.reasonType == "cancellation" ||
+                it.caption?.contains("aus", ignoreCase = true) == true ||
+                it.caption?.contains("cancell", ignoreCase = true) == true
     } ?: false

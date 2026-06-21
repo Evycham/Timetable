@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
+import org.json.JSONObject
 
 /**
  * Globale Erweiterung zur Bereitstellung der DataStore-Instanz
@@ -98,7 +99,8 @@ class UserSchedulePreferencesStore(
             preferences[GROUPS_CODE_KEY],
             preferences[IS_DYNAMIC_COLOR_KEY] ?: false,
             preferences[IS_CANCELLATION_ALERT_KEY] ?: true,
-            preferences[IS_ROOM_CHANGE_ALERT_KEY] ?: true
+            preferences[IS_ROOM_CHANGE_ALERT_KEY] ?: true,
+            parseEmojis(preferences[MODULE_EMOJIS_KEY])
         )
     }
 
@@ -121,7 +123,48 @@ class UserSchedulePreferencesStore(
         store[IS_DYNAMIC_COLOR_KEY] = preferences.isDynamicColorEnabled
         store[IS_CANCELLATION_ALERT_KEY] = preferences.isCancellationAlertEnabled
         store[IS_ROOM_CHANGE_ALERT_KEY] = preferences.isRoomChangeAlertEnabled
+        if (preferences.moduleEmojis.isEmpty()) {
+            store.remove(MODULE_EMOJIS_KEY)
+        } else {
+            store[MODULE_EMOJIS_KEY] = serializeEmojis(preferences.moduleEmojis)
+        }
+    }
 
+    /**
+     * Parst die JSON-Zeichenkette der Emojis in eine Map (Modulname -> Emoji).
+     *
+     * @param jsonStr Der serialisierte JSON-String aus dem DataStore.
+     * @return Eine Map mit den Emojis oder eine leere Map bei Fehlern/leeren Daten.
+     */
+    private fun parseEmojis(jsonStr: String?): Map<String, String> {
+        if (jsonStr.isNullOrBlank()) return emptyMap()
+        return try {
+            val jsonObject = JSONObject(jsonStr)
+            val map = mutableMapOf<String, String>()
+            val keys = jsonObject.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val value = jsonObject.optString(key) ?: ""
+                map[key] = value
+            }
+            map
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    /**
+     * Serialisiert die Emoji-Map in eine JSON-Zeichenkette zur Speicherung im DataStore.
+     *
+     * @param emojis Die zu serialisierende Map (Modulname -> Emoji).
+     * @return Die JSON-Zeichenkette.
+     */
+    private fun serializeEmojis(emojis: Map<String, String>): String {
+        val jsonObject = JSONObject()
+        for ((key, value) in emojis) {
+            jsonObject.put(key, value)
+        }
+        return jsonObject.toString()
     }
 
     companion object {
@@ -132,5 +175,6 @@ class UserSchedulePreferencesStore(
         private val IS_DYNAMIC_COLOR_KEY = booleanPreferencesKey("is_dynamic_color")
         private val IS_CANCELLATION_ALERT_KEY = booleanPreferencesKey("is_cancellation_alert")
         private val IS_ROOM_CHANGE_ALERT_KEY = booleanPreferencesKey("is_room_change_alert")
+        private val MODULE_EMOJIS_KEY = stringPreferencesKey("module_emojis")
     }
 }

@@ -52,7 +52,7 @@ class InitialSetupViewModel(
                         isLoading = false
                     )
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _uiState.update { current ->
                     current.copy(
                         faculties = emptyList(),
@@ -64,7 +64,7 @@ class InitialSetupViewModel(
         }
     }
 
-    fun selectFaculty(faculty: Faculty) {
+    fun selectFaculty(faculty: Faculty?) {
         _uiState.update { current ->
             current.copy(
                 selectedFaculty = faculty,

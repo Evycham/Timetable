@@ -194,6 +194,63 @@ class UserTimetableService(
     }
 
     /**
+     * Aktiviert oder deaktiviert das dynamische Farbschema (Material You) in den Einstellungen.
+     *
+     * @param enabled true, wenn das dynamische Farbschema aktiviert werden soll, andernfalls false.
+     */
+    suspend fun setDynamicColorEnabled(enabled: Boolean) {
+        preferencesStore.update { current -> current.copy(isDynamicColorEnabled = enabled) }
+    }
+
+    /**
+     * Aktiviert oder deaktiviert Benachrichtigungen bei Vorlesungsausfällen.
+     *
+     * @param enabled true, wenn Ausfall-Benachrichtigungen aktiv sein sollen, andernfalls false.
+     */
+    suspend fun setCancellationAlertEnabled(enabled: Boolean) {
+        preferencesStore.update { current -> current.copy(isCancellationAlertEnabled = enabled) }
+    }
+
+    /**
+     * Aktiviert oder deaktiviert Benachrichtigungen bei Raumänderungen.
+     *
+     * @param enabled true, wenn Raumänderungs-Benachrichtigungen aktiv sein sollen, andernfalls false.
+     */
+    suspend fun setRoomChangeAlertEnabled(enabled: Boolean) {
+        preferencesStore.update { current -> current.copy(isRoomChangeAlertEnabled = enabled) }
+    }
+
+    /**
+     * Speichert oder aktualisiert ein zugeordnetes Emoji für ein bestimmtes Modul.
+     *
+     * @param title Der Name der Lehrveranstaltung bzw. des Moduls.
+     * @param emoji Das neue Emoji-Symbol, das für diesen Kurs angezeigt werden soll.
+     */
+    suspend fun updateModuleEmoji(title: String, emoji: String) {
+        preferencesStore.update { current ->
+            val updated = current.moduleEmojis.toMutableMap().apply {
+                put(title, emoji)
+            }
+            current.copy(moduleEmojis = updated)
+        }
+    }
+
+    /**
+     * Entfernt die Emoji-Zuordnung für ein bestimmtes Modul, so dass wieder das Standard-Emoji
+     * verwendet wird.
+     *
+     * @param title Der Name der Lehrveranstaltung bzw. des Moduls, dessen Emoji gelöscht werden soll.
+     */
+    suspend fun removeModuleEmoji(title: String) {
+        preferencesStore.update { current ->
+            val updated = current.moduleEmojis.toMutableMap().apply {
+                remove(title)
+            }
+            current.copy(moduleEmojis = updated)
+        }
+    }
+
+    /**
      * Löscht alle Einstellungen und Filterregeln (Fremdmodule/Ausblendungen) des Benutzers.
      * Nützlich bei einem vollständigen App-Reset oder Profilwechsel.
      */

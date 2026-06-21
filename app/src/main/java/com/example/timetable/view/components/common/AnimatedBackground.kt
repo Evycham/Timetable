@@ -1,5 +1,10 @@
 package com.example.timetable.view.components.common
 
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -7,31 +12,69 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.timetable.view.json.MockLogic
 import kotlin.math.sin
 
 /**
  * Animierter Hintergrund, der sich bewegende Wellen auf einem Canvas zeichnet.
+ * Inklusive subtilem Parallax-Effekt basierend auf der Neigung des Geräts.
  *
- * @param accentColor Die Basisfarbe, die als Grundlage für die halbtransparenten Wellenverläufe dient.
- * Wenn `null`, wird die primäre Farbe des aktuellen `MaterialTheme` oder der aktive Studiengang aus `MockLogic` verwendet.
+ * @param route Die aktuelle Navigationsroute zur Farbbestimmung.
+ * @param accentColor Optionale Akzentfarbe (überschreibt Routen-Farbe).
  */
 @Composable
 fun AnimatedBackground(
     route: String? = null,
     accentColor: Color? = null
 ) {
+    val context = LocalContext.current
+    
+    // --- Sensor Logik für Parallax ---
+    var rawTiltX by remember { mutableStateOf(0f) }
+    var rawTiltY by remember { mutableStateOf(0f) }
+
+    // Glättung der Sensor-Daten für flüssige Bewegung
+    val tiltX by animateFloatAsState(
+        targetValue = rawTiltX,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "TiltX"
+    )
+    val tiltY by animateFloatAsState(
+        targetValue = rawTiltY,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "TiltY"
+    )
+
+    DisposableEffect(Unit) {
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                if (event != null && event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+                    // Werte normalisieren und skalieren für subtilen Effekt (ca. +/- 15dp)
+                    rawTiltX = (event.values[0] / 9.81f) * 15f
+                    rawTiltY = (event.values[1] / 9.81f) * 15f
+                }
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+
+        sensorManager.registerListener(listener, accelerometer, SensorManager.SENSOR_DELAY_UI)
+        onDispose {
+            sensorManager.unregisterListener(listener)
+        }
+    }
+    // ---------------------------------
+
     // set up infinite transition for horizontal wave movement
     val infiniteTransition = rememberInfiniteTransition(label = "WaveTime")
 
@@ -63,8 +106,16 @@ fun AnimatedBackground(
         label = "TimeProgress"
     )
 
-    // base color defaults to active faculty color from MockLogic or primary theme color
-    val baseColor = accentColor ?: MockLogic.activeFacultyColor ?: MaterialTheme.colorScheme.primary
+    // base color defaults to faculty color resolved from route or primary theme color
+    val baseColor = accentColor ?: remember(route) {
+        val course = route?.substringAfter("timetable/")
+        when {
+            course != null && course.startsWith("eti-", ignoreCase = true) -> Color(0xff00bfff)
+            course != null && course.startsWith("mb-", ignoreCase = true) -> Color(0xffffd700)
+            course != null && course.startsWith("ws-", ignoreCase = true) -> Color(0xff008080)
+            else -> null
+        }
+    } ?: MaterialTheme.colorScheme.primary
 
     // animate color changes smoothly over 1000ms
     val animatedBaseColor by animateColorAsState(
@@ -131,12 +182,13 @@ fun AnimatedBackground(
                         val baseline = height * config.baselineFraction
 
                         // sum of two sine waves at integer speed multipliers avoids phase jump at loop reset
+                        // tiltX verschiebt die Phase horizontal, tiltY verschiebt die Baseline vertikal
                         val angle1 =
-                            (x * config.frequency) + (time * config.speedFactor * speedMultiplier.value)
+                            ((x + tiltX * config.speedFactor * 10f) * config.frequency) + (time * config.speedFactor * speedMultiplier.value)
                         val angle2 =
                             (x * config.frequency * 1.8f) - (time * config.harmonicSpeedFactor * speedMultiplier.value)
 
-                        val y = baseline +
+                        val y = baseline + (tiltY * config.speedFactor * 3f) +
                                 (config.amplitude * sin(angle1)) +
                                 (config.amplitude * 0.4f * sin(angle2))
 

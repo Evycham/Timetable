@@ -41,24 +41,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.timetable.data.model.Lesson
-import com.example.timetable.view.json.MockLogic
 
 /**
  * Interaktives Overlay zur Anzeige von detaillierten Informationen zu einer Vorlesung.
  * Das Overlay bietet Funktionen zum Anpassen des Modul-Icons und zum Entfernen des Moduls aus dem Plan.
  *
  * @param lesson Das ausgewählte Vorlesungsobjekt oder null, wenn kein Overlay angezeigt werden soll.
+ * @param customEmoji Das aktuell zugeordnete Emoji.
  * @param bottomPadding Zusätzlicher Abstand am unteren Rand (z. B. für die NavigationBar).
+ * @param onEmojiSelected Callback, wenn ein neues Emoji ausgewählt wird.
+ * @param onRemoveClick Callback, wenn der Kurs aus dem Plan gelöscht werden soll.
  * @param onDismiss Callback-Funktion zum Schließen des Overlays.
  */
 @Composable
 fun EventDetailOverlay(
     lesson: Lesson?,
+    customEmoji: String? = null,
     bottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
+    onEmojiSelected: (String) -> Unit = {},
+    onRemoveClick: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
-    // reactive fetch of current emoji state from the logic layer
-    val selectedEmoji = lesson?.let { MockLogic.moduleEmojis[it.title] }
+    // reactive fetch of current emoji state from parameters
+    val selectedEmoji = customEmoji
     var showDeleteConfirmation by remember { mutableStateOf(false) }
 
     // reset the confirmation dialog if the underlying lesson changes or becomes null
@@ -153,11 +158,7 @@ fun EventDetailOverlay(
                         // component to allow personalization via icon selection
                         EmojiSelector(
                             selectedEmoji = selectedEmoji,
-                            onEmojiSelected = { emoji ->
-                                if (emoji != null) {
-                                    MockLogic.setEmoji(l.title, emoji)
-                                }
-                            }
+                            onEmojiSelected = onEmojiSelected
                         )
 
                         Spacer(modifier = Modifier.height(32.dp))
@@ -295,7 +296,7 @@ fun EventDetailOverlay(
                 TextButton(
                     onClick = {
                         showDeleteConfirmation = false
-                        MockLogic.removeModule(lesson.title)
+                        onRemoveClick()
                         onDismiss()
                     },
                     colors = ButtonDefaults.textButtonColors(

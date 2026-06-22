@@ -20,6 +20,8 @@ import com.example.timetable.viewmodel.CourseSelectionViewModel
 import com.example.timetable.data.remote.DaVinciApi
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -36,9 +38,14 @@ class CourseSelectionScreenTest {
     private val preferencesStore =
         UserSchedulePreferencesStore(context.userSchedulePreferencesDataStore)
     private val repository by lazy {
+        val todayStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+        val json = TEST_JSON
+            .replace("20260615", todayStr)
+            .replace("20260616", todayStr)
+            .replace("20260617", todayStr)
         TimetableRepository(
             context = context,
-            api = DaVinciApi(downloader = { TEST_JSON }),
+            api = DaVinciApi(downloader = { json }),
             database = database
         )
     }
@@ -50,14 +57,16 @@ class CourseSelectionScreenTest {
     }
 
     @Before
-    fun setUp() = runBlocking {
-        // Reset preferences and rules
-        preferencesStore.clear()
-        database.userRulesDao().clearExtra()
-        database.userRulesDao().clearHidden()
+    fun setUp() {
+        runBlocking {
+            // Reset preferences and rules
+            preferencesStore.clear()
+            database.userRulesDao().clearExtra()
+            database.userRulesDao().clearHidden()
 
-        // Reload test data into DB
-        repository.reloadJson()
+            // Reload test data into DB
+            repository.reloadJson()
+        }
     }
 
     @Test
@@ -76,13 +85,15 @@ class CourseSelectionScreenTest {
     }
 
     @Test
-    fun courseSelectionScreen_searchAndSelectModule_showsNoConflictPreview() = runBlocking {
-        preferencesStore.save(
-            UserSchedulePreferences(
-                isSetupComplete = true,
-                groupsCode = "ws-Stat I Ü"
+    fun courseSelectionScreen_searchAndSelectModule_showsNoConflictPreview() {
+        runBlocking {
+            preferencesStore.save(
+                UserSchedulePreferences(
+                    isSetupComplete = true,
+                    groupsCode = "ws-Stat I Ü"
+                )
             )
-        )
+        }
 
         var backCalled = false
 
@@ -115,20 +126,22 @@ class CourseSelectionScreenTest {
         composeTestRule.onNodeWithText("In den Plan aufnehmen").performClick()
 
         // Check if module was added to DB extra rules and back navigation triggered
-        val extras = database.userRulesDao().getExtraLessons()
+        val extras = runBlocking { database.userRulesDao().getExtraLessons() }
         assertTrue(extras.any { it.title == moduleTitle })
         assertTrue(backCalled)
     }
 
     @Test
-    fun courseSelectionScreen_selectedModuleConflicts_showsWarningPreview() = runBlocking {
-        // Enrolled in ETI course, which includes the conflicting "Conflict Course"
-        preferencesStore.save(
-            UserSchedulePreferences(
-                isSetupComplete = true,
-                groupsCode = "eti-Auton. Mob. Syst. Vorl."
+    fun courseSelectionScreen_selectedModuleConflicts_showsWarningPreview() {
+        runBlocking {
+            // Enrolled in ETI course, which includes the conflicting "Conflict Course"
+            preferencesStore.save(
+                UserSchedulePreferences(
+                    isSetupComplete = true,
+                    groupsCode = "eti-Auton. Mob. Syst. Vorl."
+                )
             )
-        )
+        }
 
         composeTestRule.setContent {
             TimeTableTheme {
@@ -152,7 +165,39 @@ class CourseSelectionScreenTest {
         )[0].assertIsDisplayed()
 
         // Add button should change text to force add
-        composeTestRule.onNodeWithText("Trotzdem hinzufügen").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Trotzdem In den Plan aufnehmen").assertIsDisplayed()
+    }
+
+    @Test
+    fun courseSelectionScreen_searchByTeacher_showsResult() {
+        composeTestRule.setContent {
+            TimeTableTheme {
+                CourseSelectionScreen(viewModel = viewModel)
+            }
+        }
+
+        // Type search query for teacher code
+        composeTestRule.onNodeWithText("Name, Dozent, Raum...").performTextInput("Garske")
+
+        // Result card should be displayed (corresponds to eti-Autonome Mobile Systeme Vorl.)
+        val moduleTitle = "eti-Autonome Mobile Systeme Vorl."
+        composeTestRule.onNodeWithText(moduleTitle).assertIsDisplayed()
+    }
+
+    @Test
+    fun courseSelectionScreen_searchByRoom_showsResult() {
+        composeTestRule.setContent {
+            TimeTableTheme {
+                CourseSelectionScreen(viewModel = viewModel)
+            }
+        }
+
+        // Type search query for room code
+        composeTestRule.onNodeWithText("Name, Dozent, Raum...").performTextInput("4/221")
+
+        // Result card should be displayed
+        val moduleTitle = "eti-Autonome Mobile Systeme Vorl."
+        composeTestRule.onNodeWithText(moduleTitle).assertIsDisplayed()
     }
 
     companion object {

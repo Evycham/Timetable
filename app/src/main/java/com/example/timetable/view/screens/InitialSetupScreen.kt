@@ -35,6 +35,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.collectAsState
 import com.example.timetable.view.components.common.SelectionChip
 import com.example.timetable.viewmodel.InitialSetupViewModel
+import com.example.timetable.view.theme.LocalBackgroundAccentColor
 
 /**
  * Der Onboarding-Bildschirm für die Ersteinrichtung der App.
@@ -72,6 +74,17 @@ fun InitialSetupScreen(
 
     val searchQuery = uiState.searchQuery
     val selectedFaculty = uiState.selectedFaculty
+
+    val localAccentColor = LocalBackgroundAccentColor.current
+    LaunchedEffect(selectedFaculty) {
+        localAccentColor.value = selectedFaculty?.color
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            localAccentColor.value = null
+        }
+    }
 
     LaunchedEffect(uiState.isSetupComplete) {
         if (uiState.isSetupComplete) {

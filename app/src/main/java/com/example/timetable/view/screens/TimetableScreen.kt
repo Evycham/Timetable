@@ -9,6 +9,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarViewDay
 import androidx.compose.material.icons.filled.CalendarViewWeek
@@ -16,13 +17,13 @@ import androidx.compose.material.icons.filled.Settings
 import com.example.timetable.view.components.timetable.LiveUpdateBanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.timetable.view.components.timetable.DailyView
 import com.example.timetable.view.components.timetable.EventDetailOverlay
 import com.example.timetable.view.components.timetable.TimetableGrid
@@ -30,6 +31,7 @@ import com.example.timetable.data.model.Lesson
 import com.example.timetable.viewmodel.TimetableViewModel
 import com.example.timetable.data.repository.RepositorySyncState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import com.example.timetable.utils.plusWeekdays
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
@@ -123,28 +125,17 @@ fun TimetableScreen(
 
     Scaffold(
         containerColor = Color.Transparent,
-        topBar = {
-            // top bar navigation and actions
-            TopAppBar(
-                title = { },
-                actions = {
-                    IconButton(onClick = onNavigateToCourseSelection) {
-                        Icon(Icons.Default.Add, contentDescription = "Module hinzufügen")
-                    }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Einstellungen")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
         bottomBar = {
             // weekly/daily navigation bar selections
             NavigationBar(
                 modifier = Modifier
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
-                    .clip(RoundedCornerShape(24.dp)),
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                    .padding(horizontal = 24.dp)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(vertical = 8.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .height(64.dp),
+                windowInsets = WindowInsets(0, 0, 0, 0),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
                 tonalElevation = 8.dp
             ) {
                 val dailyActive = viewMode == TimetableViewMode.DAILY
@@ -157,7 +148,12 @@ fun TimetableScreen(
                             viewMode = TimetableViewMode.DAILY
                         }
                     },
-                    label = { Text("Heute", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) },
+                    label = {
+                        Text(
+                            "Heute",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+                        )
+                    },
                     icon = {
                         Icon(
                             imageVector = Icons.Default.CalendarViewDay,
@@ -182,7 +178,12 @@ fun TimetableScreen(
                             viewMode = TimetableViewMode.WEEKLY
                         }
                     },
-                    label = { Text("Woche", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) },
+                    label = {
+                        Text(
+                            "Woche",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+                        )
+                    },
                     icon = {
                         Icon(
                             imageVector = Icons.Default.CalendarViewWeek,
@@ -220,6 +221,41 @@ fun TimetableScreen(
                     .padding(innerPadding)
                     .fillMaxSize()
             ) {
+                // Custom compact top bar row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 0.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Zurück",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onNavigateToCourseSelection) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "Module hinzufügen",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = "Einstellungen",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    }
+                }
                 // dynamic alerts banner displayed if changes are found
                 if (activeWarning != null && activeWarning.first != dismissedWarningMessage) {
                     LiveUpdateBanner(
@@ -240,7 +276,7 @@ fun TimetableScreen(
                             state = dayPagerState,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
-                            val targetDate = today.plusDays((page - INITIAL_PAGE).toLong())
+                            val targetDate = today.plusWeekdays((page - INITIAL_PAGE).toLong())
                             val dayLessons = lessons.filter { it.date == targetDate.toString() }
 
                             DailyView(
@@ -278,6 +314,7 @@ fun TimetableScreen(
                                     )
                             ) {
                                 TimetableGrid(
+                                    weekStart = weekStart,
                                     lessons = weekLessons,
                                     customEmojis = customEmojis,
                                     currentTime = if (weekOffset == 0L) LocalTime.now() else null,

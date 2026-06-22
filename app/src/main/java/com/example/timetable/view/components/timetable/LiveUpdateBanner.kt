@@ -12,7 +12,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 /**
  * Hinweisbanner, das am oberen Bildschirmrand wichtige Planänderungen wie Ausfälle oder
@@ -76,8 +75,7 @@ fun LiveUpdateBanner(
                 )
                 Text(
                     text = message,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                    lineHeight = 14.sp
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
 

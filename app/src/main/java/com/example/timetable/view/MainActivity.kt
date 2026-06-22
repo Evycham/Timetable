@@ -23,6 +23,15 @@ import com.example.timetable.view.navigation.TimetableNavHost
 import com.example.timetable.view.theme.TimeTableTheme
 import androidx.work.WorkManager
 import com.example.timetable.data.services.TimetableSyncWorker
+import androidx.compose.runtime.collectAsState
+import com.example.timetable.data.local.preferences.UserSchedulePreferences
+import com.example.timetable.data.local.preferences.UserSchedulePreferencesStore
+import com.example.timetable.data.local.preferences.userSchedulePreferencesDataStore
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.Color
+import com.example.timetable.view.theme.LocalBackgroundAccentColor
 
 class MainActivity : ComponentActivity() {
     @SuppressLint("SourceLockedOrientationActivity")
@@ -45,23 +54,35 @@ class MainActivity : ComponentActivity() {
             syncRequest
         )
 
-        setContent {
-            TimeTableTheme {
-                // create navcontroller
-                val navController = rememberNavController()
-                // watch current nav-entry and route for wave animation onChange
-                val currentBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentRoute = currentBackStackEntry?.destination?.route
+        val preferencesStore = UserSchedulePreferencesStore(applicationContext.userSchedulePreferencesDataStore)
 
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+        setContent {
+            val preferences by preferencesStore.preferencesFlow.collectAsState(initial = UserSchedulePreferences())
+            val dynamicColor = preferences.isDynamicColorEnabled
+            val appFontSize = preferences.appFontSize
+            val backgroundAccentColor = remember { mutableStateOf<Color?>(null) }
+
+            CompositionLocalProvider(LocalBackgroundAccentColor provides backgroundAccentColor) {
+                TimeTableTheme(
+                    dynamicColor = dynamicColor,
+                    appFontSize = appFontSize
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        // route as key for animation on sceen change
-                        AnimatedBackground(route = currentRoute)
-                        // navController gets navhost
-                        TimetableNavHost(navController = navController)
+                    // create navcontroller
+                    val navController = rememberNavController()
+                    // watch current nav-entry and route for wave animation onChange
+                    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+                    val currentRoute = currentBackStackEntry?.destination?.route
+
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            // route as key for animation on sceen change
+                            AnimatedBackground(route = currentRoute)
+                            // navController gets navhost
+                            TimetableNavHost(navController = navController)
+                        }
                     }
                 }
             }

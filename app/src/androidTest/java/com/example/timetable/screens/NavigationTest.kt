@@ -31,9 +31,11 @@ class NavigationTest {
         UserSchedulePreferencesStore(context.userSchedulePreferencesDataStore)
 
     @Before
-    fun setUp() = runBlocking {
-        // Reset preferences before each test
-        preferencesStore.clear()
+    fun setUp() {
+        runBlocking {
+            // Reset preferences before each test
+            preferencesStore.clear()
+        }
     }
 
     @Test
@@ -50,15 +52,17 @@ class NavigationTest {
     }
 
     @Test
-    fun startApp_withSetupComplete_showsTimetableScreen() = runBlocking {
+    fun startApp_withSetupComplete_showsTimetableScreen() {
         // Simulate setup complete
         val testCourse = "eti-SKIB_4"
-        preferencesStore.save(
-            UserSchedulePreferences(
-                isSetupComplete = true,
-                groupsCode = testCourse
+        runBlocking {
+            preferencesStore.save(
+                UserSchedulePreferences(
+                    isSetupComplete = true,
+                    groupsCode = testCourse
+                )
             )
-        )
+        }
 
         composeTestRule.setContent {
             TimeTableTheme {

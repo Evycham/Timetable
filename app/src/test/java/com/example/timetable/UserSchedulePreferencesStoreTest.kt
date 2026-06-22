@@ -22,11 +22,13 @@ class UserSchedulePreferencesStoreTest {
 
         val initialPrefs = store.preferencesFlow.first()
         assertEquals(null, initialPrefs.groupsCode)
+        assertEquals("Mittel", initialPrefs.appFontSize)
 
         val newPrefs = UserSchedulePreferences(
             isSetupComplete = true,
             groupsCode = "mb-MBB_4",
-            isDynamicColorEnabled = true
+            isDynamicColorEnabled = true,
+            appFontSize = "Groß"
         )
         store.save(newPrefs)
 
@@ -34,6 +36,7 @@ class UserSchedulePreferencesStoreTest {
         assertTrue(preferences.isSetupComplete)
         assertEquals("mb-MBB_4", preferences.groupsCode)
         assertTrue(preferences.isDynamicColorEnabled)
+        assertEquals("Groß", preferences.appFontSize)
     }
 
     @Test
@@ -62,5 +65,29 @@ class UserSchedulePreferencesStoreTest {
         store.update { it.copy(moduleEmojis = emptyMap()) }
         val updatedPrefs = store.preferencesFlow.first()
         assertTrue(updatedPrefs.moduleEmojis.isEmpty())
+    }
+
+    @Test
+    fun save_and_load_preferences_with_font_size() = runBlocking {
+        val tempDir = Files.createTempDirectory("preferences-store-font-test").toFile()
+        val dataStore = PreferenceDataStoreFactory.create(
+            produceFile = { tempDir.resolve("user-preferences.preferences_pb") }
+        )
+        val store = UserSchedulePreferencesStore(dataStore)
+
+        val newPrefs = UserSchedulePreferences(
+            isSetupComplete = true,
+            groupsCode = "mb-MBB_4",
+            appFontSize = "Groß"
+        )
+        store.save(newPrefs)
+
+        val preferences = store.preferencesFlow.first()
+        assertEquals("Groß", preferences.appFontSize)
+
+        // Update to small
+        store.update { it.copy(appFontSize = "Klein") }
+        val updatedPrefs = store.preferencesFlow.first()
+        assertEquals("Klein", updatedPrefs.appFontSize)
     }
 }

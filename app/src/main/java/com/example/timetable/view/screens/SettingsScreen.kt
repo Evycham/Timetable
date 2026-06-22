@@ -8,6 +8,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.School
@@ -160,6 +161,14 @@ fun SettingsScreen(
                         checked = isDynamicColorEnabled,
                         onCheckedChange = { viewModel.updateDynamicColor(it) }
                     )
+                    SettingsSelectorRow(
+                        icon = Icons.Default.FormatSize,
+                        title = "Schriftgröße",
+                        subtitle = "Darstellungstexte anpassen",
+                        selectedValue = preferences.appFontSize,
+                        options = listOf("Klein", "Mittel", "Groß"),
+                        onValueChange = { viewModel.updateAppFontSize(it) }
+                    )
                 }
             }
 
@@ -304,5 +313,85 @@ private fun SettingsToggleRow(
                 checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
             )
         )
+    }
+}
+
+/**
+ * Eine Tabellenzeile innerhalb eines Einstellungskartenbereichs, die ein Dropdown-Menü
+ * zur Auswahl eines String-Werts aus einer Liste von Optionen bietet.
+ *
+ * @param icon Das Vektorsymbol auf der linken Seite.
+ * @param title Die Bezeichnung der Einstellung.
+ * @param subtitle Die Beschreibung der Auswirkungen dieser Einstellung.
+ * @param selectedValue Der aktuell ausgewählte Wert.
+ * @param options Die Liste der wählbaren Optionen.
+ * @param onValueChange Callback, wenn ein neuer Wert ausgewählt wird.
+ */
+@Composable
+private fun SettingsSelectorRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    selectedValue: String,
+    options: List<String>,
+    onValueChange: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { expanded = true }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            modifier = Modifier.size(24.dp)
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Box {
+            Text(
+                text = selectedValue,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            onValueChange(option)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
     }
 }

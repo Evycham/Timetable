@@ -18,6 +18,8 @@ import com.example.timetable.view.theme.TimeTableTheme
 import com.example.timetable.viewmodel.TimetableViewModel
 import com.example.timetable.data.remote.DaVinciApi
 import kotlinx.coroutines.runBlocking
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -34,9 +36,14 @@ class TimetableScreenUiTest {
     private val preferencesStore =
         UserSchedulePreferencesStore(context.userSchedulePreferencesDataStore)
     private val repository by lazy {
+        val todayStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+        val json = TEST_JSON
+            .replace("20260615", todayStr)
+            .replace("20260616", todayStr)
+            .replace("20260617", todayStr)
         TimetableRepository(
             context = context,
-            api = DaVinciApi(downloader = { TEST_JSON }),
+            api = DaVinciApi(downloader = { json }),
             database = database
         )
     }
@@ -48,26 +55,30 @@ class TimetableScreenUiTest {
     }
 
     @Before
-    fun setUp() = runBlocking {
-        // Reset preferences and rules
-        preferencesStore.clear()
-        database.userRulesDao().clearExtra()
-        database.userRulesDao().clearHidden()
+    fun setUp() {
+        runBlocking {
+            // Reset preferences and rules
+            preferencesStore.clear()
+            database.userRulesDao().clearExtra()
+            database.userRulesDao().clearHidden()
 
-        // Reload test data into DB
-        repository.reloadJson()
+            // Reload test data into DB
+            repository.reloadJson()
+        }
     }
 
     @Test
-    fun timetableScreen_displaysCourseNameAndLessons() = runBlocking {
+    fun timetableScreen_displaysCourseNameAndLessons() {
         val testCourse = "eti-Auton. Mob. Syst. Vorl."
 
-        preferencesStore.save(
-            UserSchedulePreferences(
-                isSetupComplete = true,
-                groupsCode = testCourse
+        runBlocking {
+            preferencesStore.save(
+                UserSchedulePreferences(
+                    isSetupComplete = true,
+                    groupsCode = testCourse
+                )
             )
-        )
+        }
 
         composeTestRule.setContent {
             TimeTableTheme {
@@ -90,15 +101,17 @@ class TimetableScreenUiTest {
     }
 
     @Test
-    fun timetableScreen_opensOverlayOnLessonSelection() = runBlocking {
+    fun timetableScreen_opensOverlayOnLessonSelection() {
         val testCourse = "eti-Auton. Mob. Syst. Vorl."
 
-        preferencesStore.save(
-            UserSchedulePreferences(
-                isSetupComplete = true,
-                groupsCode = testCourse
+        runBlocking {
+            preferencesStore.save(
+                UserSchedulePreferences(
+                    isSetupComplete = true,
+                    groupsCode = testCourse
+                )
             )
-        )
+        }
 
         composeTestRule.setContent {
             TimeTableTheme {
@@ -121,15 +134,17 @@ class TimetableScreenUiTest {
     }
 
     @Test
-    fun timetableScreen_emptyState_showsNoLessonsMessage() = runBlocking {
+    fun timetableScreen_emptyState_showsNoLessonsMessage() {
         val testCourse = "non-existent-course"
 
-        preferencesStore.save(
-            UserSchedulePreferences(
-                isSetupComplete = true,
-                groupsCode = testCourse
+        runBlocking {
+            preferencesStore.save(
+                UserSchedulePreferences(
+                    isSetupComplete = true,
+                    groupsCode = testCourse
+                )
             )
-        )
+        }
 
         composeTestRule.setContent {
             TimeTableTheme {

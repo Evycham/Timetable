@@ -100,7 +100,8 @@ class UserSchedulePreferencesStore(
             preferences[IS_DYNAMIC_COLOR_KEY] ?: false,
             preferences[IS_CANCELLATION_ALERT_KEY] ?: true,
             preferences[IS_ROOM_CHANGE_ALERT_KEY] ?: true,
-            parseEmojis(preferences[MODULE_EMOJIS_KEY])
+            parseEmojis(preferences[MODULE_EMOJIS_KEY]),
+            preferences[APP_FONT_SIZE_KEY] ?: "Mittel"
         )
     }
 
@@ -128,6 +129,7 @@ class UserSchedulePreferencesStore(
         } else {
             store[MODULE_EMOJIS_KEY] = serializeEmojis(preferences.moduleEmojis)
         }
+        store[APP_FONT_SIZE_KEY] = preferences.appFontSize
     }
 
     /**
@@ -176,5 +178,6 @@ class UserSchedulePreferencesStore(
         private val IS_CANCELLATION_ALERT_KEY = booleanPreferencesKey("is_cancellation_alert")
         private val IS_ROOM_CHANGE_ALERT_KEY = booleanPreferencesKey("is_room_change_alert")
         private val MODULE_EMOJIS_KEY = stringPreferencesKey("module_emojis")
+        private val APP_FONT_SIZE_KEY = stringPreferencesKey("app_font_size")
     }
 }

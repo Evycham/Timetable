@@ -1,7 +1,7 @@
 // Das gesamte Theme wurde über https://material-foundation.github.io/material-theme-builder/ generiert
 
 package com.example.timetable.view.theme
-import android.app.Activity
+
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -12,9 +12,18 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+
+val LocalBackgroundAccentColor = compositionLocalOf<MutableState<Color?>> {
+    mutableStateOf(null)
+}
 
 private val lightScheme = lightColorScheme(
     primary = primaryLight,
@@ -261,22 +270,59 @@ fun TimeTableTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
+    appFontSize: String = "Mittel",
     content: @Composable() () -> Unit
 ) {
-  val colorScheme = when {
-      dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-          val context = LocalContext.current
-          if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-      }
-      
-      darkTheme -> darkScheme
-      else -> lightScheme
-  }
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val context = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
 
-  MaterialTheme(
-    colorScheme = colorScheme,
-    typography = AppTypography,
-    content = content
-  )
+        darkTheme -> darkScheme
+        else -> lightScheme
+    }
+
+    val scaleFactor = when (appFontSize) {
+        "Klein" -> 0.85f
+        "Groß" -> 1.15f
+        else -> 1.0f
+    }
+
+    val scaledTypography = remember(scaleFactor) {
+        AppTypography.scale(scaleFactor)
+    }
+
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = scaledTypography,
+        content = content
+    )
+}
+
+private fun TextStyle.scale(factor: Float): TextStyle {
+    val newFontSize = if (fontSize.isSpecified) fontSize * factor else fontSize
+    val newLineHeight = if (lineHeight.isSpecified) lineHeight * factor else lineHeight
+    return copy(fontSize = newFontSize, lineHeight = newLineHeight)
+}
+
+private fun Typography.scale(factor: Float): Typography {
+    return Typography(
+        displayLarge = displayLarge.scale(factor),
+        displayMedium = displayMedium.scale(factor),
+        displaySmall = displaySmall.scale(factor),
+        headlineLarge = headlineLarge.scale(factor),
+        headlineMedium = headlineMedium.scale(factor),
+        headlineSmall = headlineSmall.scale(factor),
+        titleLarge = titleLarge.scale(factor),
+        titleMedium = titleMedium.scale(factor),
+        titleSmall = titleSmall.scale(factor),
+        bodyLarge = bodyLarge.scale(factor),
+        bodyMedium = bodyMedium.scale(factor),
+        bodySmall = bodySmall.scale(factor),
+        labelLarge = labelLarge.scale(factor),
+        labelMedium = labelMedium.scale(factor),
+        labelSmall = labelSmall.scale(factor)
+    )
 }
 

@@ -41,7 +41,7 @@ fun DailyView(
                 text = formattedDate,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Black,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 16.dp),
                 color = MaterialTheme.colorScheme.primary
             )
         }

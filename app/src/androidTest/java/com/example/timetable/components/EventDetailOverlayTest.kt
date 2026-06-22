@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.example.timetable.data.model.Lesson
 import com.example.timetable.view.components.timetable.EventDetailOverlay
 import com.example.timetable.view.theme.TimeTableTheme
@@ -71,7 +72,7 @@ class EventDetailOverlayTest {
         composeTestRule.onNodeWithText("Prof. Dr. Schmidt").assertIsDisplayed()
 
         // Verify change banner is displayed
-        composeTestRule.onNodeWithText("Raumänderung").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Raumänderung").performScrollTo().assertIsDisplayed()
 
         // Click close and check callback
         composeTestRule.onNodeWithContentDescription("Schließen").performClick()

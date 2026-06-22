@@ -22,6 +22,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlin.math.sin
+import androidx.compose.runtime.collectAsState
+import com.example.timetable.data.local.preferences.UserSchedulePreferences
+import com.example.timetable.data.local.preferences.UserSchedulePreferencesStore
+import com.example.timetable.data.local.preferences.userSchedulePreferencesDataStore
+import com.example.timetable.utils.enums.Faculty
+import com.example.timetable.view.theme.LocalBackgroundAccentColor
 
 /**
  * Animierter Hintergrund, der sich bewegende Wellen auf einem Canvas zeichnet.
@@ -36,10 +42,13 @@ fun AnimatedBackground(
     accentColor: Color? = null
 ) {
     val context = LocalContext.current
+    val preferencesStore = remember { UserSchedulePreferencesStore(context.userSchedulePreferencesDataStore) }
+    val preferences by preferencesStore.preferencesFlow.collectAsState(initial = UserSchedulePreferences())
+    val localAccentColor = LocalBackgroundAccentColor.current.value
     
     // --- Sensor Logik für Parallax ---
-    var rawTiltX by remember { mutableStateOf(0f) }
-    var rawTiltY by remember { mutableStateOf(0f) }
+    var rawTiltX by remember { mutableFloatStateOf(0f) }
+    var rawTiltY by remember { mutableFloatStateOf(0f) }
 
     // Glättung der Sensor-Daten für flüssige Bewegung
     val tiltX by animateFloatAsState(
@@ -106,14 +115,17 @@ fun AnimatedBackground(
         label = "TimeProgress"
     )
 
-    // base color defaults to faculty color resolved from route or primary theme color
-    val baseColor = accentColor ?: remember(route) {
-        val course = route?.substringAfter("timetable/")
-        when {
-            course != null && course.startsWith("eti-", ignoreCase = true) -> Color(0xff00bfff)
-            course != null && course.startsWith("mb-", ignoreCase = true) -> Color(0xffffd700)
-            course != null && course.startsWith("ws-", ignoreCase = true) -> Color(0xff008080)
-            else -> null
+    // base color defaults to faculty color resolved from route/preferences or primary theme color
+    val baseColor = accentColor ?: if (preferences.isDynamicColorEnabled) {
+        null
+    } else {
+        localAccentColor ?: remember(route, preferences.groupsCode) {
+            val course = route?.substringAfter("timetable/")?.takeIf { !it.contains("{") }
+                ?: preferences.groupsCode
+            val matchedFaculty = Faculty.entries.find { faculty ->
+                course != null && course.startsWith(faculty.prefix, ignoreCase = true)
+            }
+            matchedFaculty?.color
         }
     } ?: MaterialTheme.colorScheme.primary
 

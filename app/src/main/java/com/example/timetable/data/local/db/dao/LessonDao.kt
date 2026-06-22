@@ -137,7 +137,7 @@ interface LessonDao {
                     or (
                         el.lessonId is null 
                         and el.title = l.title 
-                        and el.groupsCode = lg.groupsCode
+                        and el.groupsCode = :userGroupsCode
                     )
             )
         )
@@ -150,7 +150,7 @@ interface LessonDao {
                     and hl.title = l.title 
                     and (
                         hl.groupsCode is null 
-                        or hl.groupsCode = lg.groupsCode
+                        or hl.groupsCode = :userGroupsCode
                     )
                 )
         )

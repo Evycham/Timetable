@@ -42,7 +42,11 @@ class CourseSelectionViewModel(
                 emptyList()
             } else {
                 lessons
-                    .filter { lesson -> lesson.title.contains(trimmed, ignoreCase = true) }
+                    .filter { lesson ->
+                        lesson.title.contains(trimmed, ignoreCase = true) ||
+                                (lesson.rooms?.any { room -> room.contains(trimmed, ignoreCase = true) } == true) ||
+                                (lesson.teacher?.any { teacher -> teacher.contains(trimmed, ignoreCase = true) } == true)
+                    }
                     .distinctBy { lesson -> lesson.title to lesson.groupsCode }
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

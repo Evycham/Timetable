@@ -13,8 +13,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.timetable.data.local.db.TimetableDatabase
 import com.example.timetable.data.local.preferences.UserSchedulePreferencesStore
 import com.example.timetable.data.local.preferences.userSchedulePreferencesDataStore
+import com.example.timetable.data.remote.DaVinciApi
 import com.example.timetable.data.repository.TimetableRepository
 import com.example.timetable.data.services.UserTimetableService
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import com.example.timetable.utils.enums.Faculty
 import com.example.timetable.view.screens.InitialSetupScreen
 import com.example.timetable.viewmodel.InitialSetupViewModel
@@ -35,15 +38,36 @@ class InitialSetupScreenTest {
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-    private val repository = TimetableRepository(context)
-    private val preferencesStore = UserSchedulePreferencesStore(context.userSchedulePreferencesDataStore)
     private val database = TimetableDatabase.getInstance(context)
-    private val userService = UserTimetableService(repository, preferencesStore, database)
-    private val viewModel = InitialSetupViewModel(repository, userService)
+    private val preferencesStore =
+        UserSchedulePreferencesStore(context.userSchedulePreferencesDataStore)
+    private val repository by lazy {
+        val todayStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+        val json = TEST_JSON
+            .replace("20260615", todayStr)
+            .replace("20260616", todayStr)
+            .replace("20260617", todayStr)
+        TimetableRepository(
+            context = context,
+            api = DaVinciApi(downloader = { json }),
+            database = database
+        )
+    }
+    private val userService by lazy {
+        UserTimetableService(repository, preferencesStore, database)
+    }
+    private val viewModel by lazy {
+        InitialSetupViewModel(repository, userService)
+    }
 
     @Before
-    fun setUp() = runBlocking {
-        preferencesStore.clear()
+    fun setUp() {
+        runBlocking {
+            preferencesStore.clear()
+            database.userRulesDao().clearExtra()
+            database.userRulesDao().clearHidden()
+            repository.reloadJson()
+        }
     }
 
     @Test
@@ -122,6 +146,48 @@ class InitialSetupScreenTest {
         // 4. Den "Stundenplan anzeigen" Button klicken
         composeTestRule.onNodeWithTag("setupContinueButton").performClick()
 
+        composeTestRule.waitForIdle()
         assert(navigationCalled)
+    }
+
+    companion object {
+        private val TEST_JSON = """
+            {
+              "result": {
+                "displaySchedule": {
+                  "lessonTimes": [
+                    {
+                      "courseTitle": "eti-Autonome Mobile Systeme Vorl.",
+                      "dates": ["20260615"],
+                      "startTime": "1015",
+                      "endTime": "1145",
+                      "classCodes": ["eti-Auton. Mob. Syst. Vorl."],
+                      "teacherCodes": ["eti-Garske"],
+                      "roomCodes": ["4/221 (H4)"]
+                    },
+                    {
+                      "courseTitle": "mb-Kostenrechnung und Kostenanalyse - ÜB",
+                      "dates": ["20260616"],
+                      "startTime": "0945",
+                      "endTime": "1115",
+                      "classCodes": ["mb-SPB_4", "eti-WETB 4", "mb-WIB_4"],
+                      "teacherCodes": ["mb-Türr"],
+                      "roomCodes": ["4/206 (H4)"]
+                    },
+                    {
+                      "courseTitle": "ws-Statistik I Übung",
+                      "dates": ["20260617"],
+                      "startTime": "1400",
+                      "endTime": "1530",
+                      "classCodes": ["ws-Stat I Ü"],
+                      "teacherCodes": ["ws-Honekamp"],
+                      "roomCodes": ["21/202 (H21)"]
+                    }
+                  ],
+                  "eventTimes": []
+                }
+              }
+            }
+        """.trimIndent()
     }
 }

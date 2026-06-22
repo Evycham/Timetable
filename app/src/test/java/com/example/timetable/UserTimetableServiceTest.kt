@@ -83,6 +83,38 @@ class UserTimetableServiceTest {
     }
 
     @Test
+    fun buildUserLessons_usesCourseWideExtraAndHiddenLessons() = runBlocking {
+        val tempDir = Files.createTempDirectory("user-timetable-service-coursewide-test").toFile()
+        val database = createDatabase()
+        val repository = TimetableRepository(
+            context = applicationContext(),
+            api = DaVinciApi(downloader = { sampleJson() }),
+            database = database
+        )
+        repository.initialize()
+
+        val preferencesStore = createPreferencesStore(tempDir)
+        val userService = UserTimetableService(repository, preferencesStore, database)
+
+        userService.setGroupsCode("mb-MBB_4")
+        userService.setSetupComplete(true)
+        userService.addExtraLesson("mb-MBB_4", "Informatik")
+
+        var userLessons = userService.userLessonsFlow().first()
+        assertEquals(3, userLessons.size) // 2 Mathe + 1 Informatik
+        assertTrue(userLessons.any { it.title == "Informatik" })
+
+        userService.hideLesson("mb-MBB_4", "Mathe")
+
+        userLessons = userService.userLessonsFlow().first()
+        assertEquals(1, userLessons.size)
+        assertEquals("Informatik", userLessons.first().title)
+
+        database.close()
+    }
+
+
+    @Test
     fun test_preference_toggles_and_emoji_management() = runBlocking {
         val tempDir = Files.createTempDirectory("user-timetable-service-prefs-test").toFile()
         val database = createDatabase()

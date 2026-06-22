@@ -33,10 +33,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.timetable.data.model.Lesson
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
 
@@ -53,6 +53,7 @@ import java.time.temporal.ChronoUnit
  */
 @Composable
 fun TimetableGrid(
+    weekStart: LocalDate = LocalDate.now().minusDays(LocalDate.now().dayOfWeek.value.toLong() - 1),
     lessons: List<Lesson>,
     customEmojis: Map<String, String> = emptyMap(),
     currentTime: LocalTime? = null,
@@ -89,17 +90,31 @@ fun TimetableGrid(
                 DayOfWeek.THURSDAY to "Do",
                 DayOfWeek.FRIDAY to "Fr"
             )
-            days.forEach { day ->
-                Text(
-                    text = dayNames[day] ?: "",
+            days.forEachIndexed { index, day ->
+                val date = weekStart.plusDays(index.toLong())
+                val dateStr = "%02d.%02d.".format(date.dayOfMonth, date.monthValue)
+
+                Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(vertical = 8.dp),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                        .padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = dateStr,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = dayNames[day] ?: "",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
 
@@ -232,7 +247,11 @@ fun TimetableGrid(
                                         .fillMaxWidth(),
                                     overlapCount = slot.size,
                                     onClick = { onLessonClick(lesson) },
-                                    onLongClick = { showPopOutLessons = slot }
+                                    onLongClick = if (slot.size > 1) {
+                                        { showPopOutLessons = slot }
+                                    } else {
+                                        null
+                                    }
                                 )
                             }
                         }
@@ -422,10 +441,7 @@ fun LessonGridItem(
                     ) {
                         Text(
                             text = lesson.rooms?.firstOrNull()?.substringBefore(" (") ?: "",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 14.sp,
-                                lineHeight = 16.sp
-                            ),
+                            style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -463,7 +479,6 @@ fun LessonGridItem(
                         Text(
                             text = "+$overlapCount",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         )
@@ -476,7 +491,7 @@ fun LessonGridItem(
 
 private val Lesson.dayOfWeek: DayOfWeek?
     get() = try {
-        java.time.LocalDate.parse(date).dayOfWeek
+        LocalDate.parse(date).dayOfWeek
     } catch (_: Exception) {
         null
     }

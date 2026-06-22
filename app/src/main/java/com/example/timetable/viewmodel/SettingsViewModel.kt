@@ -31,6 +31,15 @@ class SettingsViewModel(
     }
 
     /**
+     * Aktualisiert die Einstellung für die Schriftgröße.
+     */
+    fun updateAppFontSize(fontSize: String) {
+        viewModelScope.launch {
+            userService.setAppFontSize(fontSize)
+        }
+    }
+
+    /**
      * Aktualisiert die Einstellung für Benachrichtigungen bei Vorlesungsausfällen
      */
     fun updateCancellationAlert(enabled: Boolean) {

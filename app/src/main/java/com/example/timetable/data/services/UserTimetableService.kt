@@ -221,6 +221,15 @@ class UserTimetableService(
     }
 
     /**
+     * Legt die bevorzugte Schriftgröße der Anwendung fest.
+     *
+     * @param fontSize Die gewählte Schriftgröße ("Klein", "Mittel" oder "Groß").
+     */
+    suspend fun setAppFontSize(fontSize: String) {
+        preferencesStore.update { current -> current.copy(appFontSize = fontSize) }
+    }
+
+    /**
      * Speichert oder aktualisiert ein zugeordnetes Emoji für ein bestimmtes Modul.
      *
      * @param title Der Name der Lehrveranstaltung bzw. des Moduls.

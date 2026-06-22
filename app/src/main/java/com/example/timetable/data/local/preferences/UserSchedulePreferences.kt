@@ -19,5 +19,6 @@ data class UserSchedulePreferences(
     val isDynamicColorEnabled: Boolean = false,
     val isCancellationAlertEnabled: Boolean = true,
     val isRoomChangeAlertEnabled: Boolean = true,
-    val moduleEmojis: Map<String, String> = emptyMap()
+    val moduleEmojis: Map<String, String> = emptyMap(),
+    val appFontSize: String = "Mittel"
 )

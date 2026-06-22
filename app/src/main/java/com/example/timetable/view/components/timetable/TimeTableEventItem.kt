@@ -118,8 +118,7 @@ fun TimeTableEventItem(
                             text = event.title,
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.15.sp,
-                                fontSize = 15.sp
+                                letterSpacing = 0.15.sp
                             ),
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -130,8 +129,7 @@ fun TimeTableEventItem(
                                 text = event.category.uppercase(),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Black,
-                                    letterSpacing = 1.sp,
-                                    fontSize = 9.sp
+                                    letterSpacing = 1.sp
                                 ),
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                             )

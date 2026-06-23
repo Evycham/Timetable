@@ -1,17 +1,7 @@
 package com.example.timetable.view.navigation
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -19,10 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -68,18 +54,22 @@ sealed class Screen(val route: String) {
  */
 @Composable
 fun TimetableNavHost(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    repository: TimetableRepository? = null,
+    userService: UserTimetableService? = null
 ) {
     val context = LocalContext.current.applicationContext
-    val repository = remember { TimetableRepository(context) }
-    val userService = remember {
+    val resolvedRepository = repository ?: remember { TimetableRepository(context) }
+    val resolvedUserService = userService ?: remember(resolvedRepository) {
         UserTimetableService(
-            repository = repository,
+            repository = resolvedRepository,
             preferencesStore = UserSchedulePreferencesStore(context.userSchedulePreferencesDataStore),
             database = TimetableDatabase.getInstance(context)
         )
     }
-    val factory = remember { ViewModelFactory(repository, userService) }
+    val factory = remember(resolvedRepository, resolvedUserService) {
+        ViewModelFactory(resolvedRepository, resolvedUserService)
+    }
     val navigationViewModel: AppNavigationViewModel = viewModel(factory = factory)
 
     val isSetupComplete by navigationViewModel.isSetupComplete.collectAsState()
@@ -90,8 +80,6 @@ fun TimetableNavHost(
         startDestination = Screen.Home.route
     ) {
         composable(Screen.Home.route) {
-            val showLoading = isSetupComplete == null
-
             LaunchedEffect(isSetupComplete, currentGroupsCode) {
                 if (isSetupComplete != null) {
                     val route = if (isSetupComplete == true && !currentGroupsCode.isNullOrBlank()) {
@@ -110,33 +98,7 @@ fun TimetableNavHost(
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
-            ) {
-                AnimatedVisibility(
-                    visible = showLoading,
-                    enter = fadeIn(),
-                    exit = fadeOut()
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "HOSTvinci",
-                            style = MaterialTheme.typography.displayMedium.copy(
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = (-1).sp
-                            ),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(48.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 4.dp,
-                            strokeCap = StrokeCap.Round
-                        )
-                    }
-                }
-            }
+            ) { }
         }
         composable(Screen.InitialSetup.route) {
             val initialSetupViewModel: InitialSetupViewModel = viewModel(factory = factory)

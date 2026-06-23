@@ -55,7 +55,7 @@ sealed class Screen(val route: String) {
     object Home : Screen("home")
     object InitialSetup : Screen("initial_setup")
     object Timetable : Screen("timetable/{course}") {
-        fun createRoute(course: String) = "timetable/$course"
+        fun createRoute(course: String) = "timetable/${android.net.Uri.encode(course)}"
     }
 
     object CourseSelection : Screen("course_selection")
@@ -162,7 +162,6 @@ fun TimetableNavHost(
             TimetableScreen(
                 courseName = course,
                 viewModel = timetableViewModel,
-                onNavigateBack = { navController.popBackStack() },
                 onNavigateToCourseSelection = { navController.navigate(Screen.CourseSelection.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
             )

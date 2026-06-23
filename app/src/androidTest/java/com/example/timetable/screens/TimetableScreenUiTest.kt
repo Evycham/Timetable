@@ -2,7 +2,6 @@ package com.example.timetable.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -91,9 +90,6 @@ class TimetableScreenUiTest {
 
         // Switch to Daily View to see the Lesson Cards
         composeTestRule.onNodeWithText("Heute").performClick()
-
-        // Check if navigation icon is displayed
-        composeTestRule.onNodeWithContentDescription("Zurück").assertIsDisplayed()
 
         // Check if the lesson card is displayed (using substring without prefix to work in all views)
         composeTestRule.onNodeWithText("Autonome Mobile Systeme Vorl.", substring = true)

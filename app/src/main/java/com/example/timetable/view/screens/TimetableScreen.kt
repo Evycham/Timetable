@@ -9,7 +9,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarViewDay
 import androidx.compose.material.icons.filled.CalendarViewWeek
@@ -55,7 +54,6 @@ private const val PAGE_COUNT = 1000
  *
  * @param courseName Name des ausgewählten Studiengangs oder Kurses.
  * @param viewModel ViewModel zur Synchronisierung und Statusabfrage.
- * @param onNavigateBack Callback-Methode zur Rückkehr zur vorherigen Ansicht.
  * @param onNavigateToCourseSelection Callback-Methode zum Öffnen des Modul-Hinzufügen-Bildschirms.
  * @param onNavigateToSettings Callback-Methode zum Öffnen der App-Einstellungen.
  */
@@ -64,7 +62,6 @@ private const val PAGE_COUNT = 1000
 fun TimetableScreen(
     courseName: String,
     viewModel: TimetableViewModel,
-    onNavigateBack: () -> Unit = {},
     onNavigateToCourseSelection: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {}
 ) {
@@ -227,16 +224,9 @@ fun TimetableScreen(
                         .fillMaxWidth()
                         .statusBarsPadding()
                         .padding(horizontal = 12.dp, vertical = 0.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Zurück",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {

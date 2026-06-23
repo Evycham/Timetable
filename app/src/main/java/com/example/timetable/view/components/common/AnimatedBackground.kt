@@ -121,6 +121,7 @@ fun AnimatedBackground(
     } else {
         localAccentColor ?: remember(route, preferences.groupsCode) {
             val course = route?.substringAfter("timetable/")?.takeIf { !it.contains("{") }
+                ?.let { android.net.Uri.decode(it) }
                 ?: preferences.groupsCode
             val matchedFaculty = Faculty.entries.find { faculty ->
                 course != null && course.startsWith(faculty.prefix, ignoreCase = true)

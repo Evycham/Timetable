@@ -120,18 +120,6 @@ class TimetableRepository(
         }
     }
 
-    suspend fun prepareLaunchData(): List<CalenderDay> {
-        return initializationMutex.withLock {
-            if (hasDatabaseData()) {
-                _syncState.value = RepositorySyncState.LoadingLocal
-                refreshMemoryFromDatabase()
-                updateJsonIfNeeded()
-                calenderDays
-            } else {
-                reloadJson()
-            }
-        }
-    }
 
 
     /**
@@ -243,7 +231,7 @@ class TimetableRepository(
         calenderDays = emptyList()
     }
 
-    private suspend fun hasDatabaseData(): Boolean =
+    suspend fun hasDatabaseData(): Boolean =
         lessonDao.count() > 0 || eventDao.count() > 0
 
     private suspend fun refreshMemoryFromDatabase(): List<CalenderDay> {

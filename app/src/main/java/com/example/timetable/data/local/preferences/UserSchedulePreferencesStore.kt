@@ -29,6 +29,10 @@ class UserSchedulePreferencesStore(
     private val dataStore: DataStore<Preferences>
 ) {
 
+    @Volatile
+    private var _cachedPreferences: UserSchedulePreferences = UserSchedulePreferences()
+    val cachedPreferences: UserSchedulePreferences get() = _cachedPreferences
+
     /**
      * Ein reaktiver Stream der aktuellen Benutzereinstellungen.
      * Fängt IOExceptions ab und emittiert leere Einstellungen als Fallback.
@@ -102,7 +106,9 @@ class UserSchedulePreferencesStore(
             preferences[IS_ROOM_CHANGE_ALERT_KEY] ?: true,
             parseEmojis(preferences[MODULE_EMOJIS_KEY]),
             preferences[APP_FONT_SIZE_KEY] ?: "Mittel"
-        )
+        ).also {
+            _cachedPreferences = it
+        }
     }
 
     /**
@@ -113,6 +119,7 @@ class UserSchedulePreferencesStore(
         store: MutablePreferences,
         preferences: UserSchedulePreferences
     ) {
+        _cachedPreferences = preferences
         store[IS_SETUP_COMPLETE_KEY] = preferences.isSetupComplete
         if (preferences.groupsCode.isNullOrBlank()) {
             store.remove(GROUPS_CODE_KEY)

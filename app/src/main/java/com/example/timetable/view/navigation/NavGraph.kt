@@ -56,7 +56,8 @@ sealed class Screen(val route: String) {
 fun TimetableNavHost(
     navController: NavHostController = rememberNavController(),
     repository: TimetableRepository? = null,
-    userService: UserTimetableService? = null
+    userService: UserTimetableService? = null,
+    startDestination: String = Screen.Home.route
 ) {
     val context = LocalContext.current.applicationContext
     val resolvedRepository = repository ?: remember { TimetableRepository(context) }
@@ -77,7 +78,7 @@ fun TimetableNavHost(
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Home.route
+        startDestination = startDestination
     ) {
         composable(Screen.Home.route) {
             LaunchedEffect(isSetupComplete, currentGroupsCode) {

@@ -7,8 +7,17 @@ import java.util.concurrent.TimeUnit
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -17,21 +26,28 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import com.example.timetable.view.components.common.AnimatedBackground
 import com.example.timetable.view.navigation.TimetableNavHost
+import com.example.timetable.view.navigation.Screen
 import com.example.timetable.view.theme.TimeTableTheme
 import androidx.work.WorkManager
 import com.example.timetable.data.services.TimetableSyncWorker
@@ -53,15 +69,18 @@ import androidx.compose.ui.unit.dp
 import com.example.timetable.view.theme.LocalBackgroundAccentColor
 import com.example.timetable.R
 
-private sealed interface StartupUiState {
-    data object Preparing : StartupUiState
-    data object Ready : StartupUiState
-    data class Error(val message: String) : StartupUiState
+private sealed interface StartupState {
+    object Checking : StartupState
+    object SplashAnimating : StartupState
+    object Ready : StartupState
+    object FirstLaunchLoading : StartupState
+    data class FirstLaunchError(val message: String) : StartupState
 }
 
 class MainActivity : ComponentActivity() {
     @SuppressLint("SourceLockedOrientationActivity")
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
@@ -86,19 +105,58 @@ class MainActivity : ComponentActivity() {
             preferencesStore = preferencesStore,
             database = com.example.timetable.data.local.db.TimetableDatabase.getInstance(applicationContext)
         )
-        var startupUiState by mutableStateOf<StartupUiState>(StartupUiState.Preparing)
+        
+        var startupState by mutableStateOf<StartupState>(StartupState.Checking)
+        var initialPreferences by mutableStateOf<UserSchedulePreferences?>(null)
 
-        lifecycleScope.launch {
-            startupUiState = try {
-                repository.prepareLaunchData()
-                StartupUiState.Ready
-            } catch (_: Exception) {
-                StartupUiState.Error("Wir konnten die Stundenplandaten noch nicht herunterladen.")
+        splashScreen.setKeepOnScreenCondition {
+            startupState == StartupState.Checking
+        }
+
+        fun startLoad() {
+            lifecycleScope.launch {
+                try {
+                    val prefDeferred = async { preferencesStore.preferencesFlow.first() }
+                    
+                    if (repository.hasDatabaseData()) {
+                        // 1. Lokale Daten laden
+                        repository.initialize()
+                        initialPreferences = prefDeferred.await()
+                        
+                        // 2. Native Splash schließen, Compose Premium-Splash-Animation starten
+                        startupState = StartupState.SplashAnimating
+
+                        // 3. Netzwerk-Update asynchron im Hintergrund prüfen
+                        launch {
+                            try {
+                                repository.updateJsonIfNeeded()
+                            } catch (_: Exception) {
+                                // Fehler im Hintergrund ignorieren
+                            }
+                        }
+                    } else {
+                        // Erststart: Keine lokalen Daten
+                        initialPreferences = prefDeferred.await()
+                        startupState = StartupState.FirstLaunchLoading
+                        repository.initialize() // API Download
+                        startupState = StartupState.Ready
+                    }
+                } catch (e: Exception) {
+                    if (startupState == StartupState.FirstLaunchLoading) {
+                        startupState = StartupState.FirstLaunchError("Wir konnten die Stundenplandaten noch nicht herunterladen. Bitte Internetverbindung prüfen.")
+                    } else {
+                        startupState = StartupState.Ready
+                    }
+                }
             }
         }
 
+        startLoad()
+
         setContent {
-            val preferences by preferencesStore.preferencesFlow.collectAsState(initial = UserSchedulePreferences())
+            val preferences by preferencesStore.preferencesFlow.collectAsState(
+                initial = initialPreferences ?: UserSchedulePreferences()
+            )
             val dynamicColor = preferences.isDynamicColorEnabled
             val appFontSize = preferences.appFontSize
             val backgroundAccentColor = remember { mutableStateOf<Color?>(null) }
@@ -108,40 +166,62 @@ class MainActivity : ComponentActivity() {
                     dynamicColor = dynamicColor,
                     appFontSize = appFontSize
                 ) {
-                    // create navcontroller
                     val navController = rememberNavController()
-                    // watch current nav-entry and route for wave animation onChange
                     val currentBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentRoute = currentBackStackEntry?.destination?.route
+
+                    val startRoute = remember(preferences) {
+                        val groupsCode = preferences.groupsCode
+                        if (preferences.isSetupComplete && !groupsCode.isNullOrBlank()) {
+                            Screen.Timetable.createRoute(groupsCode)
+                        } else {
+                            Screen.InitialSetup.route
+                        }
+                    }
 
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        if (startupUiState == StartupUiState.Ready) {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                AnimatedBackground(route = currentRoute)
-                                TimetableNavHost(
-                                    navController = navController,
-                                    repository = repository,
-                                    userService = userService
+                        when (val state = startupState) {
+                            is StartupState.Ready -> {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    AnimatedBackground(route = currentRoute)
+                                    TimetableNavHost(
+                                        navController = navController,
+                                        repository = repository,
+                                        userService = userService,
+                                        startDestination = startRoute
+                                    )
+                                }
+                            }
+                            StartupState.SplashAnimating -> {
+                                PremiumSplashScreen(
+                                    onAnimationFinished = {
+                                        startupState = StartupState.Ready
+                                    }
                                 )
                             }
-                        } else {
-                            PrepareStartupScreen(
-                                startupUiState = startupUiState,
-                                onRetry = {
-                                    startupUiState = StartupUiState.Preparing
-                                    lifecycleScope.launch {
-                                        startupUiState = try {
-                                            repository.prepareLaunchData()
-                                            StartupUiState.Ready
-                                        } catch (_: Exception) {
-                                            StartupUiState.Error("Wir konnten die Stundenplandaten noch nicht herunterladen.")
-                                        }
+                            is StartupState.FirstLaunchLoading -> {
+                                PrepareStartupScreen(
+                                    isLoading = true,
+                                    errorMessage = null,
+                                    onRetry = {}
+                                )
+                            }
+                            is StartupState.FirstLaunchError -> {
+                                PrepareStartupScreen(
+                                    isLoading = false,
+                                    errorMessage = state.message,
+                                    onRetry = {
+                                        startupState = StartupState.Checking
+                                        startLoad()
                                     }
-                                }
-                            )
+                                )
+                            }
+                            StartupState.Checking -> {
+                                Box(modifier = Modifier.fillMaxSize())
+                            }
                         }
                     }
                 }
@@ -150,10 +230,86 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@SuppressLint("StateFlowValueCalledInComposition")
-@androidx.compose.runtime.Composable
+@Composable
+private fun PremiumSplashScreen(
+    onAnimationFinished: () -> Unit
+) {
+    val background = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFFFF1744),
+            Color(0xFFD50032)
+        )
+    )
+
+    var startAnimation by remember { mutableStateOf(false) }
+
+    // Spring scaling for logo (starts exactly at 76dp/160dp = 0.475f to match native size)
+    val logoScale by animateFloatAsState(
+        targetValue = if (startAnimation) 1f else 0.475f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "LogoScale"
+    )
+
+    // Offset and fade in for App Title "HOSTvinci"
+    val textAlpha by animateFloatAsState(
+        targetValue = if (startAnimation) 1f else 0f,
+        animationSpec = tween(durationMillis = 800, delayMillis = 300),
+        label = "TextAlpha"
+    )
+
+    val textOffsetY by animateDpAsState(
+        targetValue = if (startAnimation) 0.dp else 24.dp,
+        animationSpec = tween(durationMillis = 800, delayMillis = 300),
+        label = "TextOffset"
+    )
+
+    LaunchedEffect(Unit) {
+        startAnimation = true
+        delay(1200) // Keep the dynamic animation running for 1.2 seconds
+        onAnimationFinished()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(background)
+    ) {
+        // Logo is aligned at the absolute center, matching the OS Splash Screen position
+        Image(
+            painter = painterResource(R.drawable.splash_logo_image),
+            contentDescription = "HOSTvinci Logo",
+            modifier = Modifier
+                .size(160.dp)
+                .align(Alignment.Center)
+                .graphicsLayer(
+                    scaleX = logoScale,
+                    scaleY = logoScale
+                ),
+            contentScale = ContentScale.Fit
+        )
+        
+        // Text is aligned to center but offset downwards, independent of the logo position
+        Text(
+            text = "HOSTvinci",
+            color = Color.White,
+            style = MaterialTheme.typography.displayMedium,
+            fontWeight = FontWeight.Black,
+            letterSpacing = (-1.5).sp,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = 110.dp + textOffsetY)
+                .graphicsLayer(alpha = textAlpha)
+        )
+    }
+}
+
+@Composable
 private fun PrepareStartupScreen(
-    startupUiState: StartupUiState,
+    isLoading: Boolean,
+    errorMessage: String?,
     onRetry: () -> Unit
 ) {
     val background = Brush.verticalGradient(
@@ -180,23 +336,30 @@ private fun PrepareStartupScreen(
                 modifier = Modifier.size(180.dp),
                 contentScale = ContentScale.Fit
             )
-            CircularProgressIndicator(
-                color = Color.White,
-                strokeWidth = 4.dp
-            )
-            Text(
-                text = "Wir bereiten alles vor",
-                color = Color.White,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            if (startupUiState is StartupUiState.Error) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    strokeWidth = 4.dp
+                )
                 Text(
-                    text = startupUiState.message,
+                    text = "Wir bereiten alles vor",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            } else if (errorMessage != null) {
+                Text(
+                    text = errorMessage,
                     color = Color.White.copy(alpha = 0.92f),
                     style = MaterialTheme.typography.bodyMedium
                 )
-                Button(onClick = onRetry) {
+                Button(
+                    onClick = onRetry,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color(0xFFD50032)
+                    )
+                ) {
                     Text("Erneut versuchen")
                 }
             }

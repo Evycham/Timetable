@@ -21,7 +21,7 @@ class TimetableViewModel(
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5000),
-                emptyList()
+                userService.getCachedUserCalenderDays()
             )
 
     val preferences: StateFlow<com.example.timetable.data.local.preferences.UserSchedulePreferences> =

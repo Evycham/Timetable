@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -67,6 +69,7 @@ class TimetableRepository(
     // Interner und externer Status-Flow für Synchronisationsvorgänge
     private val _syncState = MutableStateFlow<RepositorySyncState>(RepositorySyncState.Idle)
     val syncState: StateFlow<RepositorySyncState> = _syncState
+    private val initializationMutex = Mutex()
 
     /**
      * Ein reaktiver Stream aller im System registrierten Vorlesungsstunden inklusive Räume und Dozenten.
@@ -99,13 +102,24 @@ class TimetableRepository(
      * @return Die initial geladenen Kalendertage.
      */
     suspend fun initialize(): List<CalenderDay> {
-        return if (hasDatabaseData()) {
-            _syncState.value = RepositorySyncState.LoadingLocal
-            refreshMemoryFromDatabase()
-        } else {
-            reloadJson()
+        if (calenderDays.isNotEmpty() && _syncState.value == RepositorySyncState.Ready) {
+            return calenderDays
+        }
+
+        return initializationMutex.withLock {
+            if (calenderDays.isNotEmpty() && _syncState.value == RepositorySyncState.Ready) {
+                return@withLock calenderDays
+            }
+
+            if (hasDatabaseData()) {
+                _syncState.value = RepositorySyncState.LoadingLocal
+                refreshMemoryFromDatabase()
+            } else {
+                reloadJson()
+            }
         }
     }
+
 
 
     /**
@@ -217,7 +231,7 @@ class TimetableRepository(
         calenderDays = emptyList()
     }
 
-    private suspend fun hasDatabaseData(): Boolean =
+    suspend fun hasDatabaseData(): Boolean =
         lessonDao.count() > 0 || eventDao.count() > 0
 
     private suspend fun refreshMemoryFromDatabase(): List<CalenderDay> {

@@ -25,7 +25,11 @@ class InitialSetupViewModel(
     private val userService: UserTimetableService
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(InitialSetupUiState())
+    private val _uiState = MutableStateFlow(
+        InitialSetupUiState(
+            isLoading = repository.getAllLessons().isEmpty()
+        )
+    )
     val uiState: StateFlow<InitialSetupUiState> = _uiState
     private var allCoursesCache: List<String> = emptyList()
 
@@ -39,8 +43,10 @@ class InitialSetupViewModel(
 
     private fun loadFaculties() {
         viewModelScope.launch {
-            _uiState.update { current ->
-                current.copy(isLoading = true, errorMessage = null)
+            if (_uiState.value.isLoading) {
+                _uiState.update { current ->
+                    current.copy(isLoading = true, errorMessage = null)
+                }
             }
 
             try {

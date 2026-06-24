@@ -82,6 +82,21 @@ class UserTimetableService(
         }
 
     /**
+     * Berechnet den gefilterten Stundenplan des Benutzers synchron aus dem RAM-Cache.
+     * Ermöglicht eine sofortige und korrekte Initialisierung des ViewModels ohne Ladelücke oder falschen Plan.
+     */
+    fun getCachedUserCalenderDays(): List<CalenderDay> {
+        val code = preferencesStore.cachedPreferences.groupsCode
+        return if (code != null) {
+            val filteredLessons = repository.getLessonsByGroupsCode(code)
+            CalenderDayMapper.build(filteredLessons, repository.getAllEvents())
+        } else {
+            emptyList()
+        }
+    }
+
+
+    /**
      * Ruft die aktuellen Benutzereinstellungen einmalig ab.
      */
     suspend fun getPreferences(): UserSchedulePreferences = preferencesStore.load()

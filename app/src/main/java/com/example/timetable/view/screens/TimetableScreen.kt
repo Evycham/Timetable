@@ -43,8 +43,11 @@ enum class TimetableViewMode {
     DAILY, WEEKLY
 }
 
-private const val INITIAL_PAGE = 500
-private const val PAGE_COUNT = 1000
+private const val DAILY_PAGE_COUNT = 356
+private const val DAILY_INITIAL_PAGE = 178
+
+private const val WEEKLY_PAGE_COUNT = 72
+private const val WEEKLY_INITIAL_PAGE = 36
 
 /**
  * Der Hauptbildschirm für die Anzeige des Stundenplans.
@@ -97,13 +100,13 @@ fun TimetableScreen(
 
     // page controller configuration for swiping days/weeks
     val dayPagerState = rememberPagerState(
-        initialPage = INITIAL_PAGE,
-        pageCount = { PAGE_COUNT }
+        initialPage = DAILY_INITIAL_PAGE,
+        pageCount = { DAILY_PAGE_COUNT }
     )
 
     val weekPagerState = rememberPagerState(
-        initialPage = INITIAL_PAGE,
-        pageCount = { PAGE_COUNT }
+        initialPage = WEEKLY_INITIAL_PAGE,
+        pageCount = { WEEKLY_PAGE_COUNT }
     )
 
     // filter lessons containing any live updates or cancellations
@@ -140,7 +143,7 @@ fun TimetableScreen(
                     selected = dailyActive,
                     onClick = {
                         if (dailyActive) {
-                            scope.launch { dayPagerState.animateScrollToPage(INITIAL_PAGE) }
+                            scope.launch { dayPagerState.animateScrollToPage(DAILY_INITIAL_PAGE) }
                         } else {
                             viewMode = TimetableViewMode.DAILY
                         }
@@ -170,7 +173,7 @@ fun TimetableScreen(
                     selected = weeklyActive,
                     onClick = {
                         if (weeklyActive) {
-                            scope.launch { weekPagerState.animateScrollToPage(INITIAL_PAGE) }
+                            scope.launch { weekPagerState.animateScrollToPage(WEEKLY_INITIAL_PAGE) }
                         } else {
                             viewMode = TimetableViewMode.WEEKLY
                         }
@@ -281,7 +284,7 @@ fun TimetableScreen(
                             state = dayPagerState,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
-                            val targetDate = today.plusWeekdays((page - INITIAL_PAGE).toLong())
+                            val targetDate = today.plusWeekdays((page - DAILY_INITIAL_PAGE).toLong())
                             val dayLessons = lessons.filter { it.date == targetDate.toString() }
 
                             DailyView(
@@ -296,7 +299,7 @@ fun TimetableScreen(
                             state = weekPagerState,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
-                            val weekOffset = (page - INITIAL_PAGE).toLong()
+                            val weekOffset = (page - WEEKLY_INITIAL_PAGE).toLong()
                             val weekStart = today.minusDays(today.dayOfWeek.value.toLong() - 1)
                                 .plusWeeks(weekOffset)
                             val weekEnd = weekStart.plusDays(6)

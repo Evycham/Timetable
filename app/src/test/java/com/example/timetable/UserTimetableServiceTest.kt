@@ -8,8 +8,11 @@ import com.example.timetable.data.repository.TimetableRepository
 import com.example.timetable.data.local.preferences.UserSchedulePreferencesStore
 import com.example.timetable.data.local.db.TimetableDatabase
 import com.example.timetable.data.remote.DaVinciApi
+import com.example.timetable.view.components.timetable.CourseIcons
 import com.example.timetable.data.services.UserTimetableService
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -164,6 +167,70 @@ class UserTimetableServiceTest {
         database.close()
     }
 
+
+    @Test
+    fun firstTimetableAssignsIconsAndKeepsThemAfterRefreshAndCustomization() = runBlocking {
+        val tempDir = Files.createTempDirectory("user-timetable-icons-test").toFile()
+        val database = createDatabase()
+        try {
+            val repository = TimetableRepository(
+                context = applicationContext(),
+                api = DaVinciApi(downloader = { sampleJson() }),
+                database = database
+            )
+            repository.initialize()
+            val preferencesStore = createPreferencesStore(tempDir)
+            val service = UserTimetableService(repository, preferencesStore, database)
+            service.completeSetup("mb-MBB_4")
+
+            val days = service.userCalenderDaysFlow().first()
+            val initialIcons = service.getPreferences().moduleEmojis
+            assertEquals(2, days.flatMap { it.lessons }.size)
+            assertEquals(setOf("Mathe"), initialIcons.keys)
+            assertTrue(initialIcons["Mathe"] in CourseIcons.iconsMap.keys)
+
+            repository.reloadJson()
+            val restartedService = UserTimetableService(repository, preferencesStore, database)
+            restartedService.userCalenderDaysFlow().first()
+            assertEquals(initialIcons, restartedService.getPreferences().moduleEmojis)
+
+            restartedService.updateModuleEmoji("Mathe", "Calculate")
+            restartedService.addExtraLessonById(repository.getAllLessons().first { it.title == "Informatik" }.id)
+            restartedService.userCalenderDaysFlow().first()
+            val updatedIcons = restartedService.getPreferences().moduleEmojis
+            assertEquals("Calculate", updatedIcons["Mathe"])
+            assertEquals(setOf("Mathe", "Informatik"), updatedIcons.keys)
+            assertEquals(2, updatedIcons.values.toSet().size)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun activeTimetableInitializesIconsWhenLessonsArriveAfterSetup() = runBlocking {
+        val tempDir = Files.createTempDirectory("user-timetable-delayed-icons-test").toFile()
+        val database = createDatabase()
+        try {
+            val repository = TimetableRepository(
+                context = applicationContext(),
+                api = DaVinciApi(downloader = { sampleJson() }),
+                database = database
+            )
+            val service = UserTimetableService(repository, createPreferencesStore(tempDir), database)
+            service.completeSetup("mb-MBB_4")
+            assertTrue(service.userLessonsFlow().first().isEmpty())
+            assertTrue(service.getPreferences().moduleEmojis.isEmpty())
+
+            withTimeout(10_000) {
+                val loadedLessons = async { service.userLessonsFlow().first { it.isNotEmpty() } }
+                repository.initialize()
+                assertEquals(2, loadedLessons.await().size)
+            }
+            assertEquals(setOf("Mathe"), service.getPreferences().moduleEmojis.keys)
+        } finally {
+            database.close()
+        }
+    }
 
     private fun createPreferencesStore(tempDir: java.io.File): UserSchedulePreferencesStore {
         val dataStore = PreferenceDataStoreFactory.create(

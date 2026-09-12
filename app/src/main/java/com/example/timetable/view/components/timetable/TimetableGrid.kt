@@ -422,7 +422,7 @@ fun LessonGridItem(
                         contentAlignment = Alignment.Center
                     ) {
                         val icon = remember(lesson.title, customEmoji) {
-                            CourseIcons.getIcon(customEmoji)
+                            CourseIcons.getIconForTitle(lesson.title, customEmoji)
                         }
                         Icon(
                             imageVector = icon,

@@ -1,17 +1,26 @@
 package com.example.timetable
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.timetable.data.repository.TimetableRepository
 import com.example.timetable.data.local.preferences.UserSchedulePreferencesStore
 import com.example.timetable.data.local.db.TimetableDatabase
 import com.example.timetable.data.remote.DaVinciApi
-import com.example.timetable.view.components.timetable.CourseIcons
 import com.example.timetable.data.services.UserTimetableService
 import kotlinx.coroutines.flow.first
+import com.example.timetable.viewmodel.TimetableViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -169,7 +178,7 @@ class UserTimetableServiceTest {
 
 
     @Test
-    fun firstTimetableAssignsIconsAndKeepsThemAfterRefreshAndCustomization() = runBlocking {
+    fun collectingTimetableDoesNotUpdatePreferences() = runBlocking {
         val tempDir = Files.createTempDirectory("user-timetable-icons-test").toFile()
         val database = createDatabase()
         try {
@@ -179,35 +188,64 @@ class UserTimetableServiceTest {
                 database = database
             )
             repository.initialize()
-            val preferencesStore = createPreferencesStore(tempDir)
+            var updates = 0
+            val preferencesStore = createPreferencesStore(tempDir) { updates++ }
             val service = UserTimetableService(repository, preferencesStore, database)
             service.completeSetup("mb-MBB_4")
+            updates = 0
 
-            val days = service.userCalenderDaysFlow().first()
-            val initialIcons = service.getPreferences().moduleEmojis
-            assertEquals(2, days.flatMap { it.lessons }.size)
-            assertEquals(setOf("Mathe"), initialIcons.keys)
-            assertTrue(initialIcons["Mathe"] in CourseIcons.iconsMap.keys)
+            val results = List(3) { async { service.userLessonsFlow().first() } }.awaitAll()
+            assertTrue(results.all { it.size == 2 })
+            assertTrue(service.getPreferences().moduleEmojis.isEmpty())
+            assertEquals(0, updates)
 
+            service.updateModuleEmoji("Mathe", "Calculate")
+            service.addExtraLessonById(repository.getAllLessons().first { it.title == "Informatik" }.id)
+            val savedPreferences = service.getPreferences()
+            updates = 0
             repository.reloadJson()
-            val restartedService = UserTimetableService(repository, preferencesStore, database)
-            restartedService.userCalenderDaysFlow().first()
-            assertEquals(initialIcons, restartedService.getPreferences().moduleEmojis)
+            service.userCalenderDaysFlow().first()
+            UserTimetableService(repository, preferencesStore, database).userLessonsFlow().first()
 
-            restartedService.updateModuleEmoji("Mathe", "Calculate")
-            restartedService.addExtraLessonById(repository.getAllLessons().first { it.title == "Informatik" }.id)
-            restartedService.userCalenderDaysFlow().first()
-            val updatedIcons = restartedService.getPreferences().moduleEmojis
-            assertEquals("Calculate", updatedIcons["Mathe"])
-            assertEquals(setOf("Mathe", "Informatik"), updatedIcons.keys)
-            assertEquals(2, updatedIcons.values.toSet().size)
+            assertEquals(savedPreferences, service.getPreferences())
+            assertEquals(0, updates)
         } finally {
             database.close()
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun activeTimetableInitializesIconsWhenLessonsArriveAfterSetup() = runBlocking {
+    fun timetableViewModelStartsWithCachedCustomIcons() = runBlocking {
+        val database = createDatabase()
+        val viewModels = ViewModelStore()
+        Dispatchers.setMain(StandardTestDispatcher())
+        try {
+            val repository = TimetableRepository(
+                context = applicationContext(),
+                api = DaVinciApi(downloader = { sampleJson() }),
+                database = database
+            )
+            val tempDir = Files.createTempDirectory("user-timetable-cached-icons-test").toFile()
+            val preferencesStore = createPreferencesStore(tempDir)
+            val service = UserTimetableService(repository, preferencesStore, database)
+            service.completeSetup("mb-MBB_4")
+            service.updateModuleEmoji("Mathe", "Calculate")
+            val savedPreferences = preferencesStore.load()
+
+            val viewModel = TimetableViewModel(repository, service)
+            viewModels.put("timetable", viewModel)
+            // No coroutines have run yet.
+            assertEquals(savedPreferences, viewModel.preferences.value)
+        } finally {
+            viewModels.clear()
+            Dispatchers.resetMain()
+            database.close()
+        }
+    }
+
+    @Test
+    fun activeTimetableDoesNotWriteIconsWhenLessonsArriveAfterSetup() = runBlocking {
         val tempDir = Files.createTempDirectory("user-timetable-delayed-icons-test").toFile()
         val database = createDatabase()
         try {
@@ -226,17 +264,25 @@ class UserTimetableServiceTest {
                 repository.initialize()
                 assertEquals(2, loadedLessons.await().size)
             }
-            assertEquals(setOf("Mathe"), service.getPreferences().moduleEmojis.keys)
+            assertTrue(service.getPreferences().moduleEmojis.isEmpty())
         } finally {
             database.close()
         }
     }
 
-    private fun createPreferencesStore(tempDir: java.io.File): UserSchedulePreferencesStore {
+    private fun createPreferencesStore(
+        tempDir: java.io.File,
+        onUpdate: () -> Unit = {}
+    ): UserSchedulePreferencesStore {
         val dataStore = PreferenceDataStoreFactory.create(
             produceFile = { tempDir.resolve("user-timetable.preferences_pb") }
         )
-        return UserSchedulePreferencesStore(dataStore)
+        return UserSchedulePreferencesStore(object : DataStore<Preferences> by dataStore {
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                onUpdate()
+                return dataStore.updateData(transform)
+            }
+        })
     }
 
     private fun createDatabase(): TimetableDatabase =

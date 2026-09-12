@@ -9,7 +9,6 @@ import com.example.timetable.data.local.db.entities.ExtraLessonEntity
 import com.example.timetable.data.local.db.entities.HiddenLessonEntity
 import com.example.timetable.data.local.db.TimetableDatabase
 import com.example.timetable.data.local.db.mapper.toModel
-import com.example.timetable.view.components.timetable.CourseIcons
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -17,7 +16,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 
 /**
  * Service zur Verwaltung und reaktiven Filterung des persönlichen Stundenplans eines Benutzers.
@@ -50,13 +48,14 @@ class UserTimetableService(
      */
     val preferencesFlow: Flow<UserSchedulePreferences> = preferencesStore.preferencesFlow
 
+    val cachedPreferences: UserSchedulePreferences get() = preferencesStore.cachedPreferences
+
     /**
      * Beobachtet reaktiv den gewählten Studiengang des Benutzers und liefert dessen gefilterten Stundenplan.
      *
      * Nutzt unter der Haube [flatMapLatest]: Sobald sich der Studiengang (`groupsCode`) in den
      * Preferences ändert, wird die Room-Abfrage automatisch mit dem neuen Parameter neu getriggert.
      * Alle Filterregeln (Fremdmodule und Ausblendungen) werden direkt auf DB-Ebene angewendet.
-     * Vor der Ausgabe werden fehlende Modul-Icons einmalig vergeben und gespeichert.
      *
      * @return Ein [Flow] mit der Liste der gefilterten [Lesson]-Objekte des Nutzers.
      */
@@ -70,20 +69,6 @@ class UserTimetableService(
                 }
             } else {
                 flowOf(emptyList())
-            }
-        }.onEach { lessons ->
-            if (lessons.isNotEmpty()) {
-                preferencesStore.update { current ->
-                    val icons = current.moduleEmojis.toMutableMap()
-                    val available = CourseIcons.iconsMap.keys
-                    val unused = (available - icons.values.toSet()).shuffled().toMutableList()
-                    for (title in lessons.map { it.title }.distinct()) {
-                        if (title in icons) continue
-                        if (unused.isEmpty()) unused.addAll(available.shuffled())
-                        icons[title] = unused.removeAt(unused.lastIndex)
-                    }
-                    current.copy(moduleEmojis = icons)
-                }
             }
         }
 

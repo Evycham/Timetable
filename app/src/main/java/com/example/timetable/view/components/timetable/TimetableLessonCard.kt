@@ -132,7 +132,7 @@ fun TimetableLessonCard(
                         modifier = Modifier.weight(1f)
                     ) {
                         val icon = remember(lesson.title, customEmoji) {
-                            CourseIcons.getIcon(customEmoji)
+                            CourseIcons.getIconForTitle(lesson.title, customEmoji)
                         }
                         Icon(
                             imageVector = icon,

@@ -102,6 +102,31 @@ object CourseIcons {
     fun getIcon(name: String?): ImageVector {
         return iconsMap[name] ?: Icons.AutoMirrored.Filled.MenuBook
     }
+
+    /** Nutzer-Auswahl hat Vorrang vor dem Standard-Icon. */
+    fun getIconNameForTitle(title: String, customIcon: String?): String =
+        customIcon?.takeIf { it in iconsMap } ?: defaultIconName(title, iconsMap.keys)
+
+    /** Rendezvous-Hashing; bei Gleichstand entscheidet der Icon-Name. */
+    internal fun defaultIconName(title: String, candidates: Collection<String>): String =
+        candidates.maxWith(
+            compareBy<String> { iconName -> mix(title.hashCode() xor iconName.hashCode()) }
+                .thenBy { it }
+        )
+
+    // MurmurHash3-Finalizer.
+    private fun mix(input: Int): Int {
+        var h = input
+        h = h xor (h ushr 16)
+        h *= 0x85ebca6b.toInt()
+        h = h xor (h ushr 13)
+        h *= 0xc2b2ae35.toInt()
+        h = h xor (h ushr 16)
+        return h
+    }
+
+    fun getIconForTitle(title: String, customIcon: String?): ImageVector =
+        getIcon(getIconNameForTitle(title, customIcon))
 }
 
 /**

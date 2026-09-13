@@ -12,6 +12,7 @@ import com.example.timetable.data.local.db.mapper.toModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -47,6 +48,8 @@ class UserTimetableService(
      */
     val preferencesFlow: Flow<UserSchedulePreferences> = preferencesStore.preferencesFlow
 
+    val cachedPreferences: UserSchedulePreferences get() = preferencesStore.cachedPreferences
+
     /**
      * Beobachtet reaktiv den gewählten Studiengang des Benutzers und liefert dessen gefilterten Stundenplan.
      *
@@ -58,8 +61,7 @@ class UserTimetableService(
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     fun userLessonsFlow(): Flow<List<Lesson>> =
-        preferencesFlow.flatMapLatest { prefs ->
-            val code = prefs.groupsCode
+        preferencesFlow.map { it.groupsCode }.distinctUntilChanged().flatMapLatest { code ->
             if (code != null) {
                 // SQLite-basierte Filterung abfragen und in Domänenmodelle transformieren
                 lessonDao.observeUserLessons(code).map { list ->

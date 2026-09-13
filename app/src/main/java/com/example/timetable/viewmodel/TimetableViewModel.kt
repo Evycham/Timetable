@@ -29,7 +29,7 @@ class TimetableViewModel(
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5000),
-                com.example.timetable.data.local.preferences.UserSchedulePreferences()
+                userService.cachedPreferences
             )
 
     val syncState: StateFlow<RepositorySyncState> = repository.syncState

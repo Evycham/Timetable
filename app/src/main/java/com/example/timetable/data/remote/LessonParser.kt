@@ -157,20 +157,22 @@ class LessonParser {
      * @return Ein Change-Objekt oder `null`, wenn keine Änderungsdaten vorhanden sind.
      */
     fun parseChange(obj: JSONObject): Lesson.Change? {
-        val source = obj.optJSONObject("change") ?: return null
+        val source = obj.optJSONObject("changes")
+            ?: obj.optJSONObject("change")
+            ?: return null
+
         val caption = source.optString("caption").takeIf { it.isNotBlank() }
         val reasonType = source.optString("reasonType").takeIf { it.isNotBlank() }
+        val isCancelled = source.optString("cancelled").isNotBlank()
         val modified = source.optString("modified")
             .takeIf { it.isNotBlank() }
             ?.let(::formatDate)
 
-        if (caption == null && reasonType == null && modified == null) {
-            return null
-        }
+        if (caption == null && reasonType == null && modified == null) return null
 
         return Lesson.Change(
-            caption = caption,
-            reasonType = reasonType,
+            caption = caption ?: if (isCancelled) "Entfällt" else null,
+            reasonType = if (isCancelled) "cancellation" else reasonType,
             modified = modified
         )
     }

@@ -23,7 +23,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.timetable.utils.getVersionName
+import com.example.timetable.view.components.common.NotificationPermissionRationaleDialog
+import com.example.timetable.view.components.common.NotificationPermissionState
+import com.example.timetable.view.components.common.rememberNotificationPermissionState
 import com.example.timetable.viewmodel.SettingsViewModel
+
+
+/**
+ * Definiert die Notification targets separat als enum
+ */
+private enum class NotificationTarget { CANCELLATION, ROOM_CHANGE }
 
 /**
  * Das Einstellungsmenü der App. Ermöglicht die Anpassung von Benutzereinstellungen wie
@@ -45,6 +54,47 @@ fun SettingsScreen(
     val isDynamicColorEnabled = preferences.isDynamicColorEnabled
     val isCancellationAlertEnabled = preferences.isCancellationAlertEnabled
     val isRoomChangeAlertEnabled = preferences.isRoomChangeAlertEnabled
+
+    var showRationaleDialog by remember { mutableStateOf(false) }
+
+    val cancellationPermissionState = rememberNotificationPermissionState { isGranted ->
+        viewModel.updateCancellationAlert(isGranted)
+    }
+
+    val roomChangePermissionState = rememberNotificationPermissionState { isGranted ->
+        viewModel.updateRoomChangeAlert(isGranted)
+    }
+
+
+    var pendingTarget by remember { mutableStateOf<NotificationTarget?>(null) }
+
+    fun handleNotificationTarget(
+        permissionState: NotificationPermissionState,
+    ) {
+        if (permissionState.permanentlyDenied) {
+            permissionState.openAppSettings()
+        } else {
+            permissionState.requestPermission()
+        }
+    }
+
+    NotificationPermissionRationaleDialog(
+        showDialog = showRationaleDialog,
+        onDismiss = { showRationaleDialog = false },
+        onConfirm = {
+            when (pendingTarget) {
+                NotificationTarget.CANCELLATION -> handleNotificationTarget(
+                    cancellationPermissionState,
+                )
+
+                NotificationTarget.ROOM_CHANGE -> handleNotificationTarget(
+                    roomChangePermissionState,
+                )
+
+                null -> {}
+            }
+        }
+    )
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -185,14 +235,28 @@ fun SettingsScreen(
                         title = "Vorlesungsausfälle",
                         subtitle = "Benachrichtigung bei abgesagten Vorlesungen",
                         checked = isCancellationAlertEnabled,
-                        onCheckedChange = { viewModel.updateCancellationAlert(it) }
+                        onCheckedChange = { enable ->
+                            if (enable && !cancellationPermissionState.hasPermission) {
+                                pendingTarget = NotificationTarget.CANCELLATION
+                                showRationaleDialog = true
+                            } else {
+                                viewModel.updateCancellationAlert(enable)
+                            }
+                        }
                     )
                     SettingsToggleRow(
                         icon = Icons.Default.Notifications,
                         title = "Raumänderungen",
                         subtitle = "Benachrichtigung bei Raum- oder Zeitänderungen",
                         checked = isRoomChangeAlertEnabled,
-                        onCheckedChange = { viewModel.updateRoomChangeAlert(it) }
+                        onCheckedChange = { enable ->
+                            if (enable && !roomChangePermissionState.hasPermission) {
+                                pendingTarget = NotificationTarget.ROOM_CHANGE
+                                showRationaleDialog = true
+                            } else {
+                                viewModel.updateRoomChangeAlert(enable)
+                            }
+                        }
                     )
                 }
             }

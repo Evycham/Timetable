@@ -52,6 +52,7 @@ dependencies {
     testImplementation(libs.json)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.rules)
     implementation(libs.androidx.work.runtime)
     // --- UI START ---
     implementation(libs.androidx.activity.compose)

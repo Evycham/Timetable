@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.collectAsState
 import com.example.timetable.view.components.common.SelectionChip
+import com.example.timetable.view.components.common.rememberNotificationPermissionState
 import com.example.timetable.viewmodel.InitialSetupViewModel
 import com.example.timetable.view.theme.LocalBackgroundAccentColor
 
@@ -79,6 +80,8 @@ fun InitialSetupScreen(
     LaunchedEffect(selectedFaculty) {
         localAccentColor.value = selectedFaculty?.color
     }
+
+    val permissionState = rememberNotificationPermissionState()
 
     DisposableEffect(Unit) {
         onDispose {
@@ -310,6 +313,9 @@ fun InitialSetupScreen(
                                 onClick = {
                                     selectedCourse?.let {
                                         viewModel.completeSetup(it)
+                                        if (!permissionState.hasPermission) {
+                                            permissionState.requestPermission()
+                                        }
                                     }
                                 },
                                 modifier = Modifier

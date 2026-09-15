@@ -11,11 +11,12 @@ import org.junit.Test
 class TimetableAlertDetectorTest {
 
     private val detector = TimetableAlertDetector()
+    private val futureDate = java.time.LocalDate.now().plusDays(7).toString()
 
     @Test
     fun detectAlerts_detectsCancellation() {
         val lesson = Lesson(
-            id = "1", title = "Mathe", date = "2026-05-18",
+            id = "1", title = "Mathe", date = futureDate,
             startTime = "09:45", endTime = "11:15", groupsCode = setOf("A")
         )
         val oldLessons = listOf(lesson)
@@ -37,12 +38,12 @@ class TimetableAlertDetectorTest {
     @Test
     fun detectAlerts_detectsRoomChange() {
         val oldLesson = Lesson(
-            id = "1", title = "Mathe", date = "2026-05-18",
+            id = "1", title = "Mathe", date = futureDate,
             startTime = "09:45", endTime = "11:15", groupsCode = setOf("A"),
             rooms = setOf("4/302")
         )
         val newLesson = oldLesson.copy(rooms = setOf("4/999"))
-        
+
         val oldLessons = listOf(oldLesson)
         val newLessons = listOf(newLesson)
 
@@ -63,12 +64,12 @@ class TimetableAlertDetectorTest {
     @Test
     fun detectAlerts_respectsHiddenRules_forRoomChange() {
         val oldLesson = Lesson(
-            id = "1", title = "Mathe", date = "2026-05-18",
+            id = "1", title = "Mathe", date = futureDate,
             startTime = "09:45", endTime = "11:15", groupsCode = setOf("A"),
             rooms = setOf("4/302")
         )
         val newLesson = oldLesson.copy(rooms = setOf("4/999"))
-        
+
         val oldLessons = listOf(oldLesson)
         val newLessons = listOf(newLesson)
 
@@ -89,7 +90,7 @@ class TimetableAlertDetectorTest {
         // If matchingNew is null, it won't add a ROOM_CHANGE alert.
         // BUT it might add a CANCELLATION alert because it's no longer in the user's plan.
         // However, detector logic step 2 checks if it exists in ALL newLessons, not just user lessons.
-        
+
         assertEquals(0, alerts.size)
     }
 }

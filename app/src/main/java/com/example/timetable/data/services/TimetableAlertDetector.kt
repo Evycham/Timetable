@@ -29,6 +29,8 @@ class TimetableAlertDetector {
         hiddenLessons: List<HiddenLessonEntity>
     ): List<TimetableAlert> {
         val alerts = mutableListOf<TimetableAlert>()
+        val today = java.time.LocalDate.now().toString()
+        val cancelledOldLessons = mutableSetOf<Lesson>()
 
         // 1. filtern, welche der neuen vorlesungen laut den user regeln im plan landen würden
         val newUserLessons = newLessons.filter { lesson ->
@@ -52,20 +54,32 @@ class TimetableAlertDetector {
 
         // 2. abgesagte vorlesungen: war im alten plan, fehlt neuen komplett (nach koordinaten)
         for (oldLesson in oldUserLessons) {
-            val existsInNew = newLessons.any { newLesson ->
+            // alles aus der Vergangenheit und schon abgesagte skippen
+            if (oldLesson.date < today) continue
+            if (oldLesson in cancelledOldLessons) continue
+
+            val existsInNew = newLessons.firstOrNull { newLesson ->
                 newLesson.title == oldLesson.title &&
                         newLesson.date == oldLesson.date &&
                         newLesson.startTime == oldLesson.startTime &&
                         newLesson.groupsCode.intersect(oldLesson.groupsCode).isNotEmpty()
             }
-            if (!existsInNew) {
+
+            val isCancelledInNew = existsInNew?.change?.let { change ->
+                change.reasonType == "cancellation" ||
+                        change.caption?.contains("Keine Vertretung", ignoreCase = true) == true
+            } ?: false
+
+            if (existsInNew == null || isCancelledInNew) {
+                cancelledOldLessons += oldLesson
+
                 alerts.add(
                     TimetableAlert(
                         type = AlertType.CANCELLATION,
                         lessonTitle = oldLesson.title,
                         date = oldLesson.date,
                         startTime = oldLesson.startTime,
-                        detail = "Die Einheit wurde abgesagt."
+                        detail = existsInNew?.change?.caption ?: "Die Einheit wurde abgesagt."
                     )
                 )
             }
@@ -73,6 +87,9 @@ class TimetableAlertDetector {
 
         // 3. raumänderungen: vorlesung existiert in beiden, aber der raum hat sich geändert
         for (oldLesson in oldUserLessons) {
+            // alles aus der Vergangenheit skippen
+            if (oldLesson.date < today) continue
+
             val matchingNew = newUserLessons.firstOrNull { newLesson ->
                 newLesson.title == oldLesson.title &&
                         newLesson.date == oldLesson.date &&
